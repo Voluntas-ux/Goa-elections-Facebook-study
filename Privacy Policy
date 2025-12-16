@@ -1,0 +1,33 @@
+
+# Privacy Policy
+
+## Introduction
+This Privacy Policy describes how data is collected, used, and handled in the Goa Assembly Elections 2022 Facebook research project.
+
+## Data Collected
+This project collects only:
+- Public Facebook Page posts
+- Page names
+- Post text
+- Post timestamps
+- Public permalinks
+
+No personal user data, private profiles, messages, or non-public information is accessed or stored.
+
+## Purpose of Data Collection
+Data is collected solely for:
+- Academic research
+- Network analysis of political communication
+- Replication and validation of existing scholarly literature
+
+## Data Storage and Security
+- Data is stored locally in CSV format
+- No data is shared with third parties
+- Data is not sold, monetized, or used for advertising
+
+## User Privacy
+This project does not track individuals or attempt to identify users. All analysis is conducted at the Page or aggregate textual level.
+
+## Contact
+For questions regarding this policy, contact the repository maintainer via GitHub.
+
