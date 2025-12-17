@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goa 2022 Elections - Network Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        #viz-container {
+            flex: 1;
+            position: relative;
+            background: white;
+            margin: 10px;
+            border-radius: 10px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .node {
+            cursor: pointer;
+            stroke: white;
+            stroke-width: 2px;
+        }
+        
+        .node.user {
+            fill: #3498db;
+        }
+        
+        .node.keyword {
+            fill: #e74c3c;
+        }
+        
+        .node:hover {
+            stroke: #f39c12;
+            stroke-width: 3px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.3;
+            stroke-width: 1px;
+        }
+        
+        .node-label {
+            font-size: 10px;
+            font-weight: 500;
+            fill: #333;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+        
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            max-width: 250px;
+            z-index: 100;
+        }
+        
+        #tooltip.visible {
+            opacity: 1;
+        }
+        
+        .tooltip-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #f39c12;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
+            z-index: 10;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 5px 5px 0 0;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <h1>🗳️ Goa Assembly Elections 2022 - Network Analysis</h1>
+            <div class="stats">
+                <div class="stat">
+                    <span>Total Nodes:</span>
+                    <span class="stat-value" id="node-count">0</span>
+                </div>
+                <div class="stat">
+                    <span>Total Connections:</span>
+                    <span class="stat-value" id="edge-count">0</span>
+                </div>
+                <div class="stat">
+                    <span>Users/Channels:</span>
+                    <span class="stat-value" id="user-count">0</span>
+                </div>
+                <div class="stat">
+                    <span>Keywords:</span>
+                    <span class="stat-value" id="keyword-count">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="viz-container">
+            <svg id="network"></svg>
+            
+            <div id="controls">
+                <div class="control-group">
+                    <label>💡 Controls:</label>
+                    <button onclick="resetZoom()">Reset View</button>
+                    <button onclick="toggleLabels()">Toggle Labels</button>
+                </div>
+                <div style="margin-top: 10px; color: #999; font-size: 11px;">
+                    🖱️ Drag to pan | Scroll to zoom<br>
+                    🎯 Hover over nodes for details
+                </div>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-title">Legend</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3498db;"></div>
+                    <span>Users / Channels</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e74c3c;"></div>
+                    <span>Keywords / Topics</span>
+                </div>
+                <div style="margin-top: 10px; font-size: 11px; color: #999;">
+                    Size = Number of connections
+                </div>
+            </div>
+        </div>
+        
+        <div id="tooltip"></div>
+    </div>
+
+    <script>
+        // Network data
+        const networkData = {"nodes": [{"id": "@joymascarenhas3491", "label": "@joymascarenhas3491", "type": "user", "degree": 4, "x": -43.99474575366835, "y": -4.6359592866889}, {"id": "good", "label": "good", "type": "keyword", "degree": 13, "x": 7.786950636342845, "y": 10.371675184555635}, {"id": "@m.b.nagaraj7666", "label": "@m.b.nagaraj7666", "type": "user", "degree": 6, "x": -36.02635748728516, "y": -55.945897285026824}, {"id": "@lucaspinto3728", "label": "@lucaspinto3728", "type": "user", "degree": 6, "x": 14.201223609422401, "y": -81.12350330198329}, {"id": "@jayantabhaduri2296", "label": "@jayantabhaduri2296", "type": "user", "degree": 6, "x": 14.436676467937481, "y": -37.99925001190574}, {"id": "which", "label": "which", "type": "keyword", "degree": 11, "x": -14.33488982873616, "y": 11.646090313615732}, {"id": "@chittadas5724", "label": "@chittadas5724", "type": "user", "degree": 3, "x": 29.224268625036835, "y": -70.73896101766161}, {"id": "@donghuaromance863", "label": "@donghuaromance863", "type": "user", "degree": 3, "x": 119.86834895899212, "y": 16.909031004823706}, {"id": "@vithiatharan3394", "label": "@vithiatharan3394", "type": "user", "degree": 13, "x": 21.157477597212527, "y": 55.65369801837247}, {"id": "time", "label": "time", "type": "keyword", "degree": 18, "x": 9.796267913660543, "y": -7.92769197862667}, {"id": "@Asperyourschoise", "label": "@Asperyourschoise", "type": "user", "degree": 5, "x": 4.724329196912851, "y": -94.17822141658625}, {"id": "@ajitnaik1024", "label": "@ajitnaik1024", "type": "user", "degree": 3, "x": -4.343882956463789, "y": -43.52562754711504}, {"id": "@skflyingclub655", "label": "@skflyingclub655", "type": "user", "degree": 1, "x": 82.56040990399819, "y": -90.69511729457604}, {"id": "@VIJAY-cq4hz", "label": "@VIJAY-cq4hz", "type": "user", "degree": 11, "x": -5.779769762521736, "y": 52.70360333943918}, {"id": "like", "label": "like", "type": "keyword", "degree": 11, "x": -5.158589302588095, "y": -5.233015213337549}, {"id": "@elborrador333", "label": "@elborrador333", "type": "user", "degree": 3, "x": -64.25286382807217, "y": 80.38318699492108}, {"id": "@Zrodrigues100", "label": "@Zrodrigues100", "type": "user", "degree": 5, "x": -41.676362064913945, "y": 52.72792106909523}, {"id": "@joaquimsilveira6439", "label": "@joaquimsilveira6439", "type": "user", "degree": 1, "x": -2.923220147291408, "y": 6.632083796963248}, {"id": "@vipulbhatnagar1756", "label": "@vipulbhatnagar1756", "type": "user", "degree": 0, "x": -28.554580060733407, "y": -63.924732042846486}, {"id": "@eliasdsouza9398", "label": "@eliasdsouza9398", "type": "user", "degree": 2, "x": -26.562074041001416, "y": 27.93776976120797}, {"id": "@Myworldisgoa", "label": "@Myworldisgoa", "type": "user", "degree": 1, "x": 80.21417272360392, "y": 11.257112143142075}, {"id": "@johncyr9124", "label": "@johncyr9124", "type": "user", "degree": 6, "x": -56.17749232650621, "y": -12.734666156925769}, {"id": "@cindydsilva4944", "label": "@cindydsilva4944", "type": "user", "degree": 8, "x": -26.81139885779639, "y": 1.3925961078763414}, {"id": "@syedshafat618", "label": "@syedshafat618", "type": "user", "degree": 5, "x": -6.836573849947439, "y": -48.52288150396037}, {"id": "@dineshlotlikar1061", "label": "@dineshlotlikar1061", "type": "user", "degree": 5, "x": 22.04495580156458, "y": -64.70131103947895}, {"id": "@human6729", "label": "@human6729", "type": "user", "degree": 12, "x": -33.796674180867115, "y": -14.029109253869217}, {"id": "@saviofurtado6999", "label": "@saviofurtado6999", "type": "user", "degree": 5, "x": 7.77621921970706, "y": 38.3658571307256}, {"id": "@edwinantao6800", "label": "@edwinantao6800", "type": "user", "degree": 9, "x": -13.459577897195917, "y": -73.16111160460768}, {"id": "want", "label": "want", "type": "keyword", "degree": 12, "x": 6.170450709712696, "y": 11.412120010949334}, {"id": "power", "label": "power", "type": "keyword", "degree": 12, "x": -22.22262715718059, "y": 3.432766362290223}, {"id": "@leoleoleo7858", "label": "@leoleoleo7858", "type": "user", "degree": 3, "x": 87.45127287440694, "y": 6.406201609494945}, {"id": "@sandeepdhopeshwarkar1415", "label": "@sandeepdhopeshwarkar1415", "type": "user", "degree": 4, "x": 38.73248441339877, "y": 7.9195379188922495}, {"id": "@prameeladontula9839", "label": "@prameeladontula9839", "type": "user", "degree": 7, "x": 33.51499393884672, "y": -66.57541303738047}, {"id": "@AVBB1737", "label": "@AVBB1737", "type": "user", "degree": 8, "x": 16.983936009883184, "y": 32.8461851301585}, {"id": "@bijayanayak5992", "label": "@bijayanayak5992", "type": "user", "degree": 4, "x": 88.96182215670449, "y": 30.7058457310718}, {"id": "very", "label": "very", "type": "keyword", "degree": 10, "x": -18.310448577277377, "y": 23.00286886263102}, {"id": "@piero17y65", "label": "@piero17y65", "type": "user", "degree": 6, "x": -4.681834270130287, "y": 5.746509907518204}, {"id": "@cajetanpedrosa8671", "label": "@cajetanpedrosa8671", "type": "user", "degree": 8, "x": -2.4283705240998783, "y": 31.76564598636745}, {"id": "@lourencopereira9218", "label": "@lourencopereira9218", "type": "user", "degree": 2, "x": -45.560877868388744, "y": -50.553016095508546}, {"id": "@bharatbharat949", "label": "@bharatbharat949", "type": "user", "degree": 4, "x": -9.970674098841144, "y": -87.70871715744173}, {"id": "@bd3815", "label": "@bd3815", "type": "user", "degree": 7, "x": 51.37719806728532, "y": 1.8670965179709849}, {"id": "@ekdoteenchar7810", "label": "@ekdoteenchar7810", "type": "user", "degree": 4, "x": -57.180994674040456, "y": 13.73428210287937}, {"id": "@codnarcotiger4070", "label": "@codnarcotiger4070", "type": "user", "degree": 1, "x": -110.35471347790683, "y": -9.35020729022973}, {"id": "@Sk-yi6xj", "label": "@Sk-yi6xj", "type": "user", "degree": 4, "x": 36.2265373461927, "y": 76.87659185327307}, {"id": "only", "label": "only", "type": "keyword", "degree": 23, "x": 8.212032467766848, "y": -5.599333799616949}, {"id": "what", "label": "what", "type": "keyword", "degree": 17, "x": 21.575980759395854, "y": 20.002876823363696}, {"id": "about", "label": "about", "type": "keyword", "degree": 8, "x": 1.8635957326703632, "y": 24.888051461831825}, {"id": "@ganeshganesh7262", "label": "@ganeshganesh7262", "type": "user", "degree": 0, "x": 165.10498533071208, "y": -38.30878658972186}, {"id": "@fnudanzngqupi9924", "label": "@fnudanzngqupi9924", "type": "user", "degree": 2, "x": 30.370615690376844, "y": -35.48445712572766}, {"id": "@shyopatduddy7849", "label": "@shyopatduddy7849", "type": "user", "degree": 3, "x": 42.38000823832162, "y": -36.37526470239566}, {"id": "@sgup3448", "label": "@sgup3448", "type": "user", "degree": 2, "x": 9.843101669311835, "y": -15.662282293158626}, {"id": "there", "label": "there", "type": "keyword", "degree": 12, "x": 21.924167221309002, "y": 26.570842958374637}, {"id": "@jdlfernandes8916", "label": "@jdlfernandes8916", "type": "user", "degree": 3, "x": -88.58577454038812, "y": 111.43984347526762}, {"id": "@siddeshv8643", "label": "@siddeshv8643", "type": "user", "degree": 2, "x": 73.55392366743767, "y": 60.12158796372445}, {"id": "vote", "label": "vote", "type": "keyword", "degree": 20, "x": -10.512205061600923, "y": -11.30322691680329}, {"id": "@cesarcabral6484", "label": "@cesarcabral6484", "type": "user", "degree": 7, "x": 61.236307244332565, "y": -2.0364234197986026}, {"id": "political", "label": "political", "type": "keyword", "degree": 9, "x": 14.714815212682721, "y": 13.011502978501476}, {"id": "goan", "label": "goan", "type": "keyword", "degree": 10, "x": 8.726926334538904, "y": 33.880163137849514}, {"id": "people", "label": "people", "type": "keyword", "degree": 33, "x": 8.011319643474609, "y": -5.620832495200352}, {"id": "Republic World", "label": "Republic World", "type": "user", "degree": 5, "x": 27.588307359597643, "y": 44.935956850964}, {"id": "@aparnagude5461", "label": "@aparnagude5461", "type": "user", "degree": 3, "x": 109.58181287716424, "y": -54.15552328896693}, {"id": "@placydsouza5405", "label": "@placydsouza5405", "type": "user", "degree": 8, "x": -0.38086638631467556, "y": 26.451871070170167}, {"id": "delhi", "label": "delhi", "type": "keyword", "degree": 10, "x": 21.184270748027, "y": 2.88556892629541}, {"id": "@Onlyone174", "label": "@Onlyone174", "type": "user", "degree": 4, "x": -47.201365697366604, "y": 20.59919565765063}, {"id": "@UTUBE4819", "label": "@UTUBE4819", "type": "user", "degree": 5, "x": 91.0837249481035, "y": 34.236500127902644}, {"id": "more", "label": "more", "type": "keyword", "degree": 11, "x": 14.138169653644118, "y": 18.52221089321268}, {"id": "must", "label": "must", "type": "keyword", "degree": 9, "x": 25.05941381973266, "y": -0.17840858962541548}, {"id": "because", "label": "because", "type": "keyword", "degree": 10, "x": -31.338263571204998, "y": 10.612579536018524}, {"id": "@farrelgracias8730", "label": "@farrelgracias8730", "type": "user", "degree": 5, "x": -113.67738833103023, "y": -89.06041676204987}, {"id": "@pralayghosh", "label": "@pralayghosh", "type": "user", "degree": 4, "x": 50.03234097563232, "y": -22.337150550752447}, {"id": "@joeydias3028", "label": "@joeydias3028", "type": "user", "degree": 5, "x": -15.000902417602836, "y": 11.581631757596762}, {"id": "@luisfernandes681", "label": "@luisfernandes681", "type": "user", "degree": 9, "x": 66.68037593110844, "y": -0.914473437709737}, {"id": "@rameshnayak700", "label": "@rameshnayak700", "type": "user", "degree": 0, "x": 164.81956360737325, "y": -197.43567794495348}, {"id": "@kalpanaguzraty4617", "label": "@kalpanaguzraty4617", "type": "user", "degree": 3, "x": 14.72708801240611, "y": -23.15929328344368}, {"id": "give", "label": "give", "type": "keyword", "degree": 6, "x": 5.83508443296475, "y": -3.202864447802202}, {"id": "India Today", "label": "India Today", "type": "user", "degree": 4, "x": -13.408695146698776, "y": 71.17712681386448}, {"id": "@arudramaheshwar6310", "label": "@arudramaheshwar6310", "type": "user", "degree": 8, "x": -2.3278167463397876, "y": 7.267052531209765}, {"id": "@Abcnbgvgh583", "label": "@Abcnbgvgh583", "type": "user", "degree": 7, "x": 34.44566716760537, "y": 30.142951816098773}, {"id": "@patriciafernandes4042", "label": "@patriciafernandes4042", "type": "user", "degree": 6, "x": -30.545261848098182, "y": 6.5094072444068205}, {"id": "@marutanray", "label": "@marutanray", "type": "user", "degree": 3, "x": 91.87258243760755, "y": 25.937902072108738}, {"id": "money", "label": "money", "type": "keyword", "degree": 13, "x": -19.924835746776537, "y": -11.187293141899222}, {"id": "your", "label": "your", "type": "keyword", "degree": 12, "x": -2.7796260534259627, "y": 0.5831510585587002}, {"id": "@dilipdixit6105", "label": "@dilipdixit6105", "type": "user", "degree": 3, "x": 45.530088810656466, "y": -22.33431630485557}, {"id": "party", "label": "party", "type": "keyword", "degree": 37, "x": 9.258817879019281, "y": 7.0729338412984015}, {"id": "candidate", "label": "candidate", "type": "keyword", "degree": 6, "x": -7.05310769882737, "y": 26.633787315190762}, {"id": "@joelpanceles9083", "label": "@joelpanceles9083", "type": "user", "degree": 5, "x": 23.218353483939342, "y": 4.851095133417311}, {"id": "@rajeshsavji4663", "label": "@rajeshsavji4663", "type": "user", "degree": 0, "x": -237.6435022624796, "y": -27.277701078052825}, {"id": "@franciscodesouza3489", "label": "@franciscodesouza3489", "type": "user", "degree": 9, "x": 58.24669467302175, "y": 47.59284969576404}, {"id": "@galaxypinto9573", "label": "@galaxypinto9573", "type": "user", "degree": 7, "x": 12.537747236003153, "y": -28.100959987078152}, {"id": "@kongusweetie5590", "label": "@kongusweetie5590", "type": "user", "degree": 2, "x": 4.25050511882965, "y": 62.67140357987688}, {"id": "@vinayakj1033", "label": "@vinayakj1033", "type": "user", "degree": 14, "x": -54.03628243814953, "y": 40.20249385047084}, {"id": "MIRROR NOW", "label": "MIRROR NOW", "type": "user", "degree": 1, "x": -51.29369752823227, "y": 59.0284387389883}, {"id": "@saraswathyv8083", "label": "@saraswathyv8083", "type": "user", "degree": 3, "x": -44.4341998787709, "y": 70.61989409492193}, {"id": "government", "label": "government", "type": "keyword", "degree": 8, "x": 22.76861528948682, "y": 20.86267636326965}, {"id": "@vinitagoes4357", "label": "@vinitagoes4357", "type": "user", "degree": 7, "x": -26.804559676616456, "y": -40.808084138169434}, {"id": "@cleretfernandes5972", "label": "@cleretfernandes5972", "type": "user", "degree": 5, "x": 4.165242519379562, "y": -42.246221338100234}, {"id": "@dongwhan7033", "label": "@dongwhan7033", "type": "user", "degree": 4, "x": -35.96599052630648, "y": 50.19616059328227}, {"id": "parties", "label": "parties", "type": "keyword", "degree": 10, "x": 9.770282426453695, "y": 13.467825795172159}, {"id": "@aminaabdulla8611", "label": "@aminaabdulla8611", "type": "user", "degree": 5, "x": 49.47042158324278, "y": 37.90286522796192}, {"id": "@manavsaburi3993", "label": "@manavsaburi3993", "type": "user", "degree": 10, "x": 32.00887573281248, "y": 77.47833115808339}, {"id": "@rathindranathghosh848", "label": "@rathindranathghosh848", "type": "user", "degree": 7, "x": 25.7864911021441, "y": 25.876926399797846}, {"id": "@joanlobo275", "label": "@joanlobo275", "type": "user", "degree": 10, "x": -45.31221721606582, "y": 20.091495998011837}, {"id": "@aaron7960", "label": "@aaron7960", "type": "user", "degree": 2, "x": -46.87043860999246, "y": 36.395338722505464}, {"id": "@drackotrab346", "label": "@drackotrab346", "type": "user", "degree": 4, "x": -5.32731420377688, "y": 85.62664140244574}, {"id": "@irmaoseirmasdegoa7704", "label": "@irmaoseirmasdegoa7704", "type": "user", "degree": 3, "x": -143.17171127018273, "y": -6.450102766422009}, {"id": "back", "label": "back", "type": "keyword", "degree": 9, "x": -1.3590899428097576, "y": 32.65541167374169}, {"id": "@nickycruz8671", "label": "@nickycruz8671", "type": "user", "degree": 3, "x": 14.29438001479839, "y": -48.91072186164005}, {"id": "support", "label": "support", "type": "keyword", "degree": 5, "x": 11.520478143833365, "y": 26.78055205880422}, {"id": "@swaroopananodkar8283", "label": "@swaroopananodkar8283", "type": "user", "degree": 7, "x": 10.770965694954615, "y": 56.83677456593575}, {"id": "@KrugerTim", "label": "@KrugerTim", "type": "user", "degree": 5, "x": -0.00203779621044869, "y": -66.13632035124645}, {"id": "@JT-sf4sz", "label": "@JT-sf4sz", "type": "user", "degree": 3, "x": 76.47012079450714, "y": 87.71361705789765}, {"id": "@djkiki6177", "label": "@djkiki6177", "type": "user", "degree": 0, "x": 138.8127747521325, "y": 74.99323828765186}, {"id": "@khorokarkar", "label": "@khorokarkar", "type": "user", "degree": 2, "x": -71.32902852123897, "y": 95.81862458873606}, {"id": "@rajashekarana4125", "label": "@rajashekarana4125", "type": "user", "degree": 3, "x": -12.873628269643401, "y": 64.42886539980614}, {"id": "@redtongue3499", "label": "@redtongue3499", "type": "user", "degree": 0, "x": -50.22069289055843, "y": -105.60415765303316}, {"id": "@Tom-qd3cs", "label": "@Tom-qd3cs", "type": "user", "degree": 9, "x": 25.672778910129157, "y": -43.75364177595274}, {"id": "CNN-News18", "label": "CNN-News18", "type": "user", "degree": 5, "x": -50.09216552260432, "y": 38.04944246915828}, {"id": "@realnaveen", "label": "@realnaveen", "type": "user", "degree": 3, "x": 20.383612044469583, "y": -104.78749298593826}, {"id": "please", "label": "please", "type": "keyword", "degree": 8, "x": 16.242778335772257, "y": -9.994471164722649}, {"id": "@exsecular8157", "label": "@exsecular8157", "type": "user", "degree": 3, "x": 73.30842619502367, "y": 23.263363494391307}, {"id": "these", "label": "these", "type": "keyword", "degree": 12, "x": 10.579396464813778, "y": -9.163385601376314}, {"id": "@gauravkapoor3600", "label": "@gauravkapoor3600", "type": "user", "degree": 4, "x": 114.42718565089966, "y": -31.778708057327645}, {"id": "join", "label": "join", "type": "keyword", "degree": 9, "x": -14.398240034869344, "y": 34.00825806293266}, {"id": "@joydsilva9404", "label": "@joydsilva9404", "type": "user", "degree": 3, "x": -30.254740782217443, "y": 58.158596416894184}, {"id": "NDTV", "label": "NDTV", "type": "user", "degree": 2, "x": 51.61223261676136, "y": -50.772365710694366}, {"id": "@shantiemaharaj2783", "label": "@shantiemaharaj2783", "type": "user", "degree": 6, "x": -22.02954506183486, "y": -6.245735350949857}, {"id": "@odesau2b", "label": "@odesau2b", "type": "user", "degree": 0, "x": -210.1800647842792, "y": 92.64221517806715}, {"id": "@ghumraArtist", "label": "@ghumraArtist", "type": "user", "degree": 8, "x": 11.70436545713276, "y": 71.23910761134971}, {"id": "@seabreeze234", "label": "@seabreeze234", "type": "user", "degree": 5, "x": -63.43717390548474, "y": -13.721620289704509}, {"id": "@peterdsouza3122", "label": "@peterdsouza3122", "type": "user", "degree": 9, "x": -9.38495134653864, "y": -33.02191957874052}, {"id": "@identifiedchemistry2371", "label": "@identifiedchemistry2371", "type": "user", "degree": 8, "x": 6.566934871042133, "y": 25.318580120348113}, {"id": "should", "label": "should", "type": "keyword", "degree": 11, "x": 11.388215222600552, "y": 25.917410489502213}, {"id": "@jotendrakumar2852", "label": "@jotendrakumar2852", "type": "user", "degree": 6, "x": -37.53822261242126, "y": 27.67398170818341}, {"id": "@alisonn8818", "label": "@alisonn8818", "type": "user", "degree": 4, "x": 49.100282788984984, "y": 15.046423024307325}, {"id": "@anilmr1502", "label": "@anilmr1502", "type": "user", "degree": 1, "x": 80.18316065212375, "y": 5.230397695990445}, {"id": "@felixfernandes3701", "label": "@felixfernandes3701", "type": "user", "degree": 2, "x": -71.54944724317295, "y": -64.93460922155138}, {"id": "ticket", "label": "ticket", "type": "keyword", "degree": 8, "x": -23.623295983213307, "y": 7.775657695866874}, {"id": "their", "label": "their", "type": "keyword", "degree": 10, "x": -9.343346817128754, "y": 20.007381531073566}, {"id": "@shreyashdessai2859", "label": "@shreyashdessai2859", "type": "user", "degree": 3, "x": -22.29276369666136, "y": 144.3452649163311}, {"id": "kejriwal", "label": "kejriwal", "type": "keyword", "degree": 10, "x": 4.458303500320559, "y": 10.890083450650069}, {"id": "@prasadmlv8267", "label": "@prasadmlv8267", "type": "user", "degree": 0, "x": 172.10243776544016, "y": -198.90235795663222}, {"id": "goans", "label": "goans", "type": "keyword", "degree": 11, "x": -13.965420574915907, "y": 0.5851959066307689}, {"id": "@goemgoenkars2050", "label": "@goemgoenkars2050", "type": "user", "degree": 7, "x": -36.01412205891849, "y": 2.818384111561313}, {"id": "@sanjaynaik8041", "label": "@sanjaynaik8041", "type": "user", "degree": 8, "x": -76.90359949325543, "y": -8.340194646116661}, {"id": "congress", "label": "congress", "type": "keyword", "degree": 35, "x": 7.093380096003133, "y": -0.7635113048659803}, {"id": "save", "label": "save", "type": "keyword", "degree": 8, "x": -9.741862701552172, "y": -6.919094917840241}, {"id": "The Economic Times", "label": "The Economic Times", "type": "user", "degree": 1, "x": 29.712421397859575, "y": 72.24694169873474}, {"id": "they", "label": "they", "type": "keyword", "degree": 25, "x": -6.117518828008601, "y": -9.83926300907042}, {"id": "@Sambhavi369", "label": "@Sambhavi369", "type": "user", "degree": 7, "x": 68.48224105288647, "y": 3.709972491972953}, {"id": "@amarendraborah6941", "label": "@amarendraborah6941", "type": "user", "degree": 1, "x": -82.01727018036078, "y": -60.48032703174654}], "edges": [{"source": "@joymascarenhas3491", "target": "party"}, {"source": "@joymascarenhas3491", "target": "congress"}, {"source": "@joymascarenhas3491", "target": "candidate"}, {"source": "@joymascarenhas3491", "target": "should"}, {"source": "good", "target": "@cesarcabral6484"}, {"source": "good", "target": "@sandeepdhopeshwarkar1415"}, {"source": "good", "target": "@ekdoteenchar7810"}, {"source": "good", "target": "@aaron7960"}, {"source": "good", "target": "@cleretfernandes5972"}, {"source": "good", "target": "@dineshlotlikar1061"}, {"source": "good", "target": "@joeydias3028"}, {"source": "good", "target": "@kalpanaguzraty4617"}, {"source": "good", "target": "@Sambhavi369"}, {"source": "good", "target": "@lucaspinto3728"}, {"source": "good", "target": "@VIJAY-cq4hz"}, {"source": "good", "target": "@human6729"}, {"source": "good", "target": "@jotendrakumar2852"}, {"source": "@m.b.nagaraj7666", "target": "people"}, {"source": "@m.b.nagaraj7666", "target": "party"}, {"source": "@m.b.nagaraj7666", "target": "they"}, {"source": "@m.b.nagaraj7666", "target": "ticket"}, {"source": "@m.b.nagaraj7666", "target": "congress"}, {"source": "@m.b.nagaraj7666", "target": "because"}, {"source": "@lucaspinto3728", "target": "very"}, {"source": "@lucaspinto3728", "target": "which"}, {"source": "@lucaspinto3728", "target": "about"}, {"source": "@lucaspinto3728", "target": "political"}, {"source": "@lucaspinto3728", "target": "support"}, {"source": "@jayantabhaduri2296", "target": "people"}, {"source": "@jayantabhaduri2296", "target": "only"}, {"source": "@jayantabhaduri2296", "target": "party"}, {"source": "@jayantabhaduri2296", "target": "want"}, {"source": "@jayantabhaduri2296", "target": "they"}, {"source": "@jayantabhaduri2296", "target": "congress"}, {"source": "which", "target": "@jdlfernandes8916"}, {"source": "which", "target": "@joanlobo275"}, {"source": "which", "target": "@piero17y65"}, {"source": "which", "target": "@ekdoteenchar7810"}, {"source": "which", "target": "@rajashekarana4125"}, {"source": "which", "target": "@syedshafat618"}, {"source": "which", "target": "@joelpanceles9083"}, {"source": "which", "target": "@AVBB1737"}, {"source": "which", "target": "@identifiedchemistry2371"}, {"source": "which", "target": "@johncyr9124"}, {"source": "@chittadas5724", "target": "people"}, {"source": "@chittadas5724", "target": "only"}, {"source": "@chittadas5724", "target": "congress"}, {"source": "@donghuaromance863", "target": "party"}, {"source": "@donghuaromance863", "target": "government"}, {"source": "@donghuaromance863", "target": "delhi"}, {"source": "@vithiatharan3394", "target": "only"}, {"source": "@vithiatharan3394", "target": "please"}, {"source": "@vithiatharan3394", "target": "vote"}, {"source": "@vithiatharan3394", "target": "like"}, {"source": "@vithiatharan3394", "target": "these"}, {"source": "@vithiatharan3394", "target": "congress"}, {"source": "@vithiatharan3394", "target": "their"}, {"source": "@vithiatharan3394", "target": "money"}, {"source": "@vithiatharan3394", "target": "political"}, {"source": "@vithiatharan3394", "target": "parties"}, {"source": "@vithiatharan3394", "target": "there"}, {"source": "@vithiatharan3394", "target": "delhi"}, {"source": "@vithiatharan3394", "target": "more"}, {"source": "time", "target": "@ghumraArtist"}, {"source": "time", "target": "@sanjaynaik8041"}, {"source": "time", "target": "@vinitagoes4357"}, {"source": "time", "target": "@piero17y65"}, {"source": "time", "target": "@cleretfernandes5972"}, {"source": "time", "target": "@syedshafat618"}, {"source": "time", "target": "@placydsouza5405"}, {"source": "time", "target": "@drackotrab346"}, {"source": "time", "target": "@Tom-qd3cs"}, {"source": "time", "target": "@peterdsouza3122"}, {"source": "time", "target": "@arudramaheshwar6310"}, {"source": "time", "target": "@Onlyone174"}, {"source": "time", "target": "@Abcnbgvgh583"}, {"source": "time", "target": "@VIJAY-cq4hz"}, {"source": "time", "target": "@dilipdixit6105"}, {"source": "time", "target": "@shyopatduddy7849"}, {"source": "time", "target": "@identifiedchemistry2371"}, {"source": "time", "target": "@johncyr9124"}, {"source": "@Asperyourschoise", "target": "people"}, {"source": "@Asperyourschoise", "target": "they"}, {"source": "@Asperyourschoise", "target": "money"}, {"source": "@Asperyourschoise", "target": "should"}, {"source": "@Asperyourschoise", "target": "there"}, {"source": "@ajitnaik1024", "target": "party"}, {"source": "@ajitnaik1024", "target": "delhi"}, {"source": "@ajitnaik1024", "target": "kejriwal"}, {"source": "@skflyingclub655", "target": "please"}, {"source": "@VIJAY-cq4hz", "target": "party"}, {"source": "@VIJAY-cq4hz", "target": "they"}, {"source": "@VIJAY-cq4hz", "target": "very"}, {"source": "@VIJAY-cq4hz", "target": "their"}, {"source": "@VIJAY-cq4hz", "target": "should"}, {"source": "@VIJAY-cq4hz", "target": "give"}, {"source": "@VIJAY-cq4hz", "target": "because"}, {"source": "@VIJAY-cq4hz", "target": "government"}, {"source": "@VIJAY-cq4hz", "target": "delhi"}, {"source": "like", "target": "@sanjaynaik8041"}, {"source": "like", "target": "@Sk-yi6xj"}, {"source": "like", "target": "@edwinantao6800"}, {"source": "like", "target": "@dineshlotlikar1061"}, {"source": "like", "target": "@vinayakj1033"}, {"source": "like", "target": "@dongwhan7033"}, {"source": "like", "target": "@KrugerTim"}, {"source": "like", "target": "@aminaabdulla8611"}, {"source": "like", "target": "@kalpanaguzraty4617"}, {"source": "like", "target": "@exsecular8157"}, {"source": "@elborrador333", "target": "very"}, {"source": "@elborrador333", "target": "power"}, {"source": "@elborrador333", "target": "there"}, {"source": "@Zrodrigues100", "target": "people"}, {"source": "@Zrodrigues100", "target": "back"}, {"source": "@Zrodrigues100", "target": "power"}, {"source": "@Zrodrigues100", "target": "congress"}, {"source": "@Zrodrigues100", "target": "because"}, {"source": "@joaquimsilveira6439", "target": "only"}, {"source": "@eliasdsouza9398", "target": "party"}, {"source": "@eliasdsouza9398", "target": "money"}, {"source": "@Myworldisgoa", "target": "people"}, {"source": "@johncyr9124", "target": "please"}, {"source": "@johncyr9124", "target": "vote"}, {"source": "@johncyr9124", "target": "candidate"}, {"source": "@johncyr9124", "target": "give"}, {"source": "@cindydsilva4944", "target": "back"}, {"source": "@cindydsilva4944", "target": "only"}, {"source": "@cindydsilva4944", "target": "party"}, {"source": "@cindydsilva4944", "target": "want"}, {"source": "@cindydsilva4944", "target": "they"}, {"source": "@cindydsilva4944", "target": "congress"}, {"source": "@cindydsilva4944", "target": "because"}, {"source": "@cindydsilva4944", "target": "government"}, {"source": "@syedshafat618", "target": "people"}, {"source": "@syedshafat618", "target": "vote"}, {"source": "@syedshafat618", "target": "congress"}, {"source": "@dineshlotlikar1061", "target": "people"}, {"source": "@dineshlotlikar1061", "target": "please"}, {"source": "@dineshlotlikar1061", "target": "party"}, {"source": "@human6729", "target": "party"}, {"source": "@human6729", "target": "want"}, {"source": "@human6729", "target": "they"}, {"source": "@human6729", "target": "power"}, {"source": "@human6729", "target": "what"}, {"source": "@human6729", "target": "money"}, {"source": "@human6729", "target": "give"}, {"source": "@human6729", "target": "government"}, {"source": "@human6729", "target": "your"}, {"source": "@human6729", "target": "delhi"}, {"source": "@human6729", "target": "save"}, {"source": "@saviofurtado6999", "target": "people"}, {"source": "@saviofurtado6999", "target": "they"}, {"source": "@saviofurtado6999", "target": "power"}, {"source": "@saviofurtado6999", "target": "should"}, {"source": "@saviofurtado6999", "target": "support"}, {"source": "@edwinantao6800", "target": "people"}, {"source": "@edwinantao6800", "target": "party"}, {"source": "@edwinantao6800", "target": "power"}, {"source": "@edwinantao6800", "target": "congress"}, {"source": "@edwinantao6800", "target": "what"}, {"source": "@edwinantao6800", "target": "money"}, {"source": "@edwinantao6800", "target": "government"}, {"source": "@edwinantao6800", "target": "your"}, {"source": "want", "target": "@ghumraArtist"}, {"source": "want", "target": "@joanlobo275"}, {"source": "want", "target": "@luisfernandes681"}, {"source": "want", "target": "@vinayakj1033"}, {"source": "want", "target": "@placydsouza5405"}, {"source": "want", "target": "@manavsaburi3993"}, {"source": "want", "target": "@joelpanceles9083"}, {"source": "want", "target": "@Tom-qd3cs"}, {"source": "want", "target": "@bd3815"}, {"source": "power", "target": "@sanjaynaik8041"}, {"source": "power", "target": "@luisfernandes681"}, {"source": "power", "target": "@farrelgracias8730"}, {"source": "power", "target": "@khorokarkar"}, {"source": "power", "target": "@rajashekarana4125"}, {"source": "power", "target": "@prameeladontula9839"}, {"source": "power", "target": "@UTUBE4819"}, {"source": "@leoleoleo7858", "target": "people"}, {"source": "@leoleoleo7858", "target": "they"}, {"source": "@leoleoleo7858", "target": "more"}, {"source": "@sandeepdhopeshwarkar1415", "target": "very"}, {"source": "@sandeepdhopeshwarkar1415", "target": "there"}, {"source": "@sandeepdhopeshwarkar1415", "target": "more"}, {"source": "@prameeladontula9839", "target": "people"}, {"source": "@prameeladontula9839", "target": "only"}, {"source": "@prameeladontula9839", "target": "they"}, {"source": "@prameeladontula9839", "target": "these"}, {"source": "@prameeladontula9839", "target": "money"}, {"source": "@prameeladontula9839", "target": "must"}, {"source": "@AVBB1737", "target": "only"}, {"source": "@AVBB1737", "target": "what"}, {"source": "@AVBB1737", "target": "because"}, {"source": "@AVBB1737", "target": "government"}, {"source": "@AVBB1737", "target": "kejriwal"}, {"source": "@AVBB1737", "target": "there"}, {"source": "@AVBB1737", "target": "delhi"}, {"source": "@bijayanayak5992", "target": "party"}, {"source": "@bijayanayak5992", "target": "congress"}, {"source": "@bijayanayak5992", "target": "government"}, {"source": "@bijayanayak5992", "target": "there"}, {"source": "very", "target": "@cesarcabral6484"}, {"source": "very", "target": "@vinitagoes4357"}, {"source": "very", "target": "@saraswathyv8083"}, {"source": "very", "target": "@cajetanpedrosa8671"}, {"source": "very", "target": "@Sambhavi369"}, {"source": "very", "target": "@arudramaheshwar6310"}, {"source": "@piero17y65", "target": "goan"}, {"source": "@piero17y65", "target": "ticket"}, {"source": "@piero17y65", "target": "congress"}, {"source": "@piero17y65", "target": "parties"}, {"source": "@cajetanpedrosa8671", "target": "party"}, {"source": "@cajetanpedrosa8671", "target": "about"}, {"source": "@cajetanpedrosa8671", "target": "because"}, {"source": "@cajetanpedrosa8671", "target": "political"}, {"source": "@cajetanpedrosa8671", "target": "there"}, {"source": "@cajetanpedrosa8671", "target": "your"}, {"source": "@cajetanpedrosa8671", "target": "more"}, {"source": "@lourencopereira9218", "target": "only"}, {"source": "@lourencopereira9218", "target": "party"}, {"source": "@bharatbharat949", "target": "they"}, {"source": "@bharatbharat949", "target": "these"}, {"source": "@bharatbharat949", "target": "parties"}, {"source": "@bharatbharat949", "target": "must"}, {"source": "@bd3815", "target": "only"}, {"source": "@bd3815", "target": "vote"}, {"source": "@bd3815", "target": "congress"}, {"source": "@bd3815", "target": "there"}, {"source": "@bd3815", "target": "delhi"}, {"source": "@bd3815", "target": "kejriwal"}, {"source": "@ekdoteenchar7810", "target": "congress"}, {"source": "@ekdoteenchar7810", "target": "your"}, {"source": "@codnarcotiger4070", "target": "kejriwal"}, {"source": "@Sk-yi6xj", "target": "party"}, {"source": "@Sk-yi6xj", "target": "congress"}, {"source": "@Sk-yi6xj", "target": "parties"}, {"source": "only", "target": "@ghumraArtist"}, {"source": "only", "target": "@sanjaynaik8041"}, {"source": "only", "target": "@joanlobo275"}, {"source": "only", "target": "@vinitagoes4357"}, {"source": "only", "target": "@amarendraborah6941"}, {"source": "only", "target": "@aparnagude5461"}, {"source": "only", "target": "@placydsouza5405"}, {"source": "only", "target": "@cleretfernandes5972"}, {"source": "only", "target": "@vinayakj1033"}, {"source": "only", "target": "@Abcnbgvgh583"}, {"source": "only", "target": "@dongwhan7033"}, {"source": "only", "target": "@peterdsouza3122"}, {"source": "only", "target": "@cesarcabral6484"}, {"source": "only", "target": "@swaroopananodkar8283"}, {"source": "what", "target": "CNN-News18"}, {"source": "what", "target": "@cesarcabral6484"}, {"source": "what", "target": "@jdlfernandes8916"}, {"source": "what", "target": "@JT-sf4sz"}, {"source": "what", "target": "@rajashekarana4125"}, {"source": "what", "target": "@shantiemaharaj2783"}, {"source": "what", "target": "@placydsouza5405"}, {"source": "what", "target": "@manavsaburi3993"}, {"source": "what", "target": "@nickycruz8671"}, {"source": "what", "target": "@peterdsouza3122"}, {"source": "what", "target": "@franciscodesouza3489"}, {"source": "what", "target": "@Sambhavi369"}, {"source": "what", "target": "@shyopatduddy7849"}, {"source": "what", "target": "@identifiedchemistry2371"}, {"source": "about", "target": "@jdlfernandes8916"}, {"source": "about", "target": "@rathindranathghosh848"}, {"source": "about", "target": "@shantiemaharaj2783"}, {"source": "about", "target": "@manavsaburi3993"}, {"source": "about", "target": "@peterdsouza3122"}, {"source": "about", "target": "@swaroopananodkar8283"}, {"source": "@fnudanzngqupi9924", "target": "they"}, {"source": "@fnudanzngqupi9924", "target": "these"}, {"source": "@shyopatduddy7849", "target": "must"}, {"source": "@sgup3448", "target": "they"}, {"source": "@sgup3448", "target": "their"}, {"source": "there", "target": "@JT-sf4sz"}, {"source": "there", "target": "@cleretfernandes5972"}, {"source": "there", "target": "@exsecular8157"}, {"source": "there", "target": "@jotendrakumar2852"}, {"source": "@siddeshv8643", "target": "people"}, {"source": "@siddeshv8643", "target": "must"}, {"source": "vote", "target": "NDTV"}, {"source": "vote", "target": "@ghumraArtist"}, {"source": "vote", "target": "@joanlobo275"}, {"source": "vote", "target": "@placydsouza5405"}, {"source": "vote", "target": "@vinitagoes4357"}, {"source": "vote", "target": "@farrelgracias8730"}, {"source": "vote", "target": "@anilmr1502"}, {"source": "vote", "target": "@aaron7960"}, {"source": "vote", "target": "@joeydias3028"}, {"source": "vote", "target": "@seabreeze234"}, {"source": "vote", "target": "@dongwhan7033"}, {"source": "vote", "target": "@Tom-qd3cs"}, {"source": "vote", "target": "@arudramaheshwar6310"}, {"source": "vote", "target": "@galaxypinto9573"}, {"source": "vote", "target": "@goemgoenkars2050"}, {"source": "vote", "target": "@identifiedchemistry2371"}, {"source": "@cesarcabral6484", "target": "people"}, {"source": "@cesarcabral6484", "target": "congress"}, {"source": "@cesarcabral6484", "target": "kejriwal"}, {"source": "political", "target": "@JT-sf4sz"}, {"source": "political", "target": "@saraswathyv8083"}, {"source": "political", "target": "@UTUBE4819"}, {"source": "political", "target": "@vinayakj1033"}, {"source": "political", "target": "@Tom-qd3cs"}, {"source": "political", "target": "@arudramaheshwar6310"}, {"source": "goan", "target": "@shreyashdessai2859"}, {"source": "goan", "target": "@luisfernandes681"}, {"source": "goan", "target": "@seabreeze234"}, {"source": "goan", "target": "@peterdsouza3122"}, {"source": "goan", "target": "@Abcnbgvgh583"}, {"source": "goan", "target": "@Tom-qd3cs"}, {"source": "goan", "target": "@franciscodesouza3489"}, {"source": "goan", "target": "@kalpanaguzraty4617"}, {"source": "goan", "target": "@gauravkapoor3600"}, {"source": "people", "target": "@shreyashdessai2859"}, {"source": "people", "target": "@luisfernandes681"}, {"source": "people", "target": "@seabreeze234"}, {"source": "people", "target": "@patriciafernandes4042"}, {"source": "people", "target": "@farrelgracias8730"}, {"source": "people", "target": "@peterdsouza3122"}, {"source": "people", "target": "@shantiemaharaj2783"}, {"source": "people", "target": "@joelpanceles9083"}, {"source": "people", "target": "@cleretfernandes5972"}, {"source": "people", "target": "@vinayakj1033"}, {"source": "people", "target": "@aminaabdulla8611"}, {"source": "people", "target": "@franciscodesouza3489"}, {"source": "people", "target": "@pralayghosh"}, {"source": "people", "target": "@realnaveen"}, {"source": "people", "target": "@Sambhavi369"}, {"source": "people", "target": "@arudramaheshwar6310"}, {"source": "people", "target": "@galaxypinto9573"}, {"source": "people", "target": "@Onlyone174"}, {"source": "people", "target": "@identifiedchemistry2371"}, {"source": "Republic World", "target": "join"}, {"source": "Republic World", "target": "ticket"}, {"source": "Republic World", "target": "congress"}, {"source": "Republic World", "target": "candidate"}, {"source": "Republic World", "target": "kejriwal"}, {"source": "@aparnagude5461", "target": "party"}, {"source": "@aparnagude5461", "target": "congress"}, {"source": "@placydsouza5405", "target": "please"}, {"source": "@placydsouza5405", "target": "goans"}, {"source": "@placydsouza5405", "target": "save"}, {"source": "delhi", "target": "@franciscodesouza3489"}, {"source": "delhi", "target": "@Onlyone174"}, {"source": "delhi", "target": "@dilipdixit6105"}, {"source": "@Onlyone174", "target": "congress"}, {"source": "@UTUBE4819", "target": "congress"}, {"source": "@UTUBE4819", "target": "parties"}, {"source": "@UTUBE4819", "target": "more"}, {"source": "more", "target": "@vinayakj1033"}, {"source": "more", "target": "@manavsaburi3993"}, {"source": "more", "target": "India Today"}, {"source": "more", "target": "@joelpanceles9083"}, {"source": "more", "target": "@goemgoenkars2050"}, {"source": "more", "target": "@identifiedchemistry2371"}, {"source": "must", "target": "@shantiemaharaj2783"}, {"source": "must", "target": "@vinayakj1033"}, {"source": "must", "target": "@realnaveen"}, {"source": "must", "target": "@gauravkapoor3600"}, {"source": "must", "target": "@galaxypinto9573"}, {"source": "because", "target": "@sanjaynaik8041"}, {"source": "because", "target": "@vinitagoes4357"}, {"source": "because", "target": "@rathindranathghosh848"}, {"source": "because", "target": "@goemgoenkars2050"}, {"source": "@farrelgracias8730", "target": "they"}, {"source": "@farrelgracias8730", "target": "money"}, {"source": "@pralayghosh", "target": "party"}, {"source": "@pralayghosh", "target": "congress"}, {"source": "@pralayghosh", "target": "your"}, {"source": "@joeydias3028", "target": "candidate"}, {"source": "@joeydias3028", "target": "should"}, {"source": "@joeydias3028", "target": "your"}, {"source": "@luisfernandes681", "target": "back"}, {"source": "@luisfernandes681", "target": "goans"}, {"source": "@luisfernandes681", "target": "they"}, {"source": "@luisfernandes681", "target": "their"}, {"source": "@luisfernandes681", "target": "should"}, {"source": "give", "target": "@vinitagoes4357"}, {"source": "give", "target": "@vinayakj1033"}, {"source": "give", "target": "@galaxypinto9573"}, {"source": "India Today", "target": "join"}, {"source": "India Today", "target": "congress"}, {"source": "India Today", "target": "kejriwal"}, {"source": "@arudramaheshwar6310", "target": "party"}, {"source": "@arudramaheshwar6310", "target": "congress"}, {"source": "@arudramaheshwar6310", "target": "parties"}, {"source": "@Abcnbgvgh583", "target": "goans"}, {"source": "@Abcnbgvgh583", "target": "congress"}, {"source": "@Abcnbgvgh583", "target": "parties"}, {"source": "@Abcnbgvgh583", "target": "support"}, {"source": "@patriciafernandes4042", "target": "they"}, {"source": "@patriciafernandes4042", "target": "join"}, {"source": "@patriciafernandes4042", "target": "ticket"}, {"source": "@patriciafernandes4042", "target": "these"}, {"source": "@patriciafernandes4042", "target": "their"}, {"source": "@marutanray", "target": "party"}, {"source": "@marutanray", "target": "they"}, {"source": "@marutanray", "target": "congress"}, {"source": "money", "target": "@joanlobo275"}, {"source": "money", "target": "@vinitagoes4357"}, {"source": "money", "target": "@kongusweetie5590"}, {"source": "money", "target": "@drackotrab346"}, {"source": "money", "target": "@Sambhavi369"}, {"source": "money", "target": "@jotendrakumar2852"}, {"source": "your", "target": "@joelpanceles9083"}, {"source": "your", "target": "@Tom-qd3cs"}, {"source": "your", "target": "@vinayakj1033"}, {"source": "your", "target": "@manavsaburi3993"}, {"source": "your", "target": "@KrugerTim"}, {"source": "your", "target": "@galaxypinto9573"}, {"source": "@dilipdixit6105", "target": "party"}, {"source": "party", "target": "NDTV"}, {"source": "party", "target": "CNN-News18"}, {"source": "party", "target": "@ghumraArtist"}, {"source": "party", "target": "@sanjaynaik8041"}, {"source": "party", "target": "@joanlobo275"}, {"source": "party", "target": "@rathindranathghosh848"}, {"source": "party", "target": "@saraswathyv8083"}, {"source": "party", "target": "@vinayakj1033"}, {"source": "party", "target": "@manavsaburi3993"}, {"source": "party", "target": "@irmaoseirmasdegoa7704"}, {"source": "party", "target": "@KrugerTim"}, {"source": "party", "target": "@aminaabdulla8611"}, {"source": "party", "target": "@franciscodesouza3489"}, {"source": "party", "target": "@Tom-qd3cs"}, {"source": "party", "target": "@exsecular8157"}, {"source": "party", "target": "@Sambhavi369"}, {"source": "party", "target": "@goemgoenkars2050"}, {"source": "candidate", "target": "@rathindranathghosh848"}, {"source": "candidate", "target": "@drackotrab346"}, {"source": "@franciscodesouza3489", "target": "back"}, {"source": "@franciscodesouza3489", "target": "goans"}, {"source": "@franciscodesouza3489", "target": "these"}, {"source": "@franciscodesouza3489", "target": "congress"}, {"source": "@galaxypinto9573", "target": "goans"}, {"source": "@galaxypinto9573", "target": "kejriwal"}, {"source": "@kongusweetie5590", "target": "they"}, {"source": "@vinayakj1033", "target": "join"}, {"source": "@vinayakj1033", "target": "these"}, {"source": "@vinayakj1033", "target": "their"}, {"source": "@vinayakj1033", "target": "should"}, {"source": "MIRROR NOW", "target": "congress"}, {"source": "government", "target": "@gauravkapoor3600"}, {"source": "@dongwhan7033", "target": "save"}, {"source": "parties", "target": "@Tom-qd3cs"}, {"source": "parties", "target": "@swaroopananodkar8283"}, {"source": "parties", "target": "@jotendrakumar2852"}, {"source": "@aminaabdulla8611", "target": "join"}, {"source": "@aminaabdulla8611", "target": "these"}, {"source": "@manavsaburi3993", "target": "please"}, {"source": "@manavsaburi3993", "target": "they"}, {"source": "@manavsaburi3993", "target": "support"}, {"source": "@manavsaburi3993", "target": "save"}, {"source": "@rathindranathghosh848", "target": "back"}, {"source": "@rathindranathghosh848", "target": "ticket"}, {"source": "@rathindranathghosh848", "target": "should"}, {"source": "@joanlobo275", "target": "please"}, {"source": "@joanlobo275", "target": "they"}, {"source": "@joanlobo275", "target": "join"}, {"source": "@joanlobo275", "target": "their"}, {"source": "@drackotrab346", "target": "goans"}, {"source": "@irmaoseirmasdegoa7704", "target": "goans"}, {"source": "@irmaoseirmasdegoa7704", "target": "save"}, {"source": "back", "target": "@shreyashdessai2859"}, {"source": "back", "target": "@alisonn8818"}, {"source": "back", "target": "@felixfernandes3701"}, {"source": "back", "target": "@swaroopananodkar8283"}, {"source": "@nickycruz8671", "target": "they"}, {"source": "@nickycruz8671", "target": "should"}, {"source": "support", "target": "@jotendrakumar2852"}, {"source": "@swaroopananodkar8283", "target": "they"}, {"source": "@swaroopananodkar8283", "target": "their"}, {"source": "@swaroopananodkar8283", "target": "kejriwal"}, {"source": "@KrugerTim", "target": "they"}, {"source": "@KrugerTim", "target": "congress"}, {"source": "@khorokarkar", "target": "goans"}, {"source": "@Tom-qd3cs", "target": "goans"}, {"source": "CNN-News18", "target": "congress"}, {"source": "CNN-News18", "target": "join"}, {"source": "CNN-News18", "target": "kejriwal"}, {"source": "@realnaveen", "target": "save"}, {"source": "please", "target": "@ghumraArtist"}, {"source": "these", "target": "@joydsilva9404"}, {"source": "these", "target": "@seabreeze234"}, {"source": "these", "target": "@shantiemaharaj2783"}, {"source": "these", "target": "@gauravkapoor3600"}, {"source": "join", "target": "@sanjaynaik8041"}, {"source": "join", "target": "@goemgoenkars2050"}, {"source": "@joydsilva9404", "target": "ticket"}, {"source": "@joydsilva9404", "target": "congress"}, {"source": "@shantiemaharaj2783", "target": "their"}, {"source": "@ghumraArtist", "target": "goans"}, {"source": "@ghumraArtist", "target": "they"}, {"source": "@seabreeze234", "target": "save"}, {"source": "@peterdsouza3122", "target": "they"}, {"source": "@peterdsouza3122", "target": "congress"}, {"source": "@peterdsouza3122", "target": "should"}, {"source": "@identifiedchemistry2371", "target": "congress"}, {"source": "@identifiedchemistry2371", "target": "their"}, {"source": "should", "target": "@alisonn8818"}, {"source": "@jotendrakumar2852", "target": "congress"}, {"source": "@alisonn8818", "target": "ticket"}, {"source": "@alisonn8818", "target": "congress"}, {"source": "@felixfernandes3701", "target": "goans"}, {"source": "ticket", "target": "@sanjaynaik8041"}, {"source": "@goemgoenkars2050", "target": "they"}, {"source": "@goemgoenkars2050", "target": "congress"}, {"source": "congress", "target": "The Economic Times"}, {"source": "save", "target": "@Sambhavi369"}]};
+        
+        // Set up SVG
+        const svg = d3.select("#network");
+        const container = document.getElementById("viz-container");
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        svg.attr("width", width).attr("height", height);
+        
+        // Create zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 10])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Main group
+        const g = svg.append("g");
+        
+        // Update stats
+        const userCount = networkData.nodes.filter(n => n.type === 'user').length;
+        const keywordCount = networkData.nodes.filter(n => n.type === 'keyword').length;
+        
+        document.getElementById("node-count").textContent = networkData.nodes.length;
+        document.getElementById("edge-count").textContent = networkData.edges.length;
+        document.getElementById("user-count").textContent = userCount;
+        document.getElementById("keyword-count").textContent = keywordCount;
+        
+        // Create links
+        const link = g.append("g")
+            .selectAll("line")
+            .data(networkData.edges)
+            .enter()
+            .append("line")
+            .attr("class", "link");
+        
+        // Create nodes
+        const node = g.append("g")
+            .selectAll("circle")
+            .data(networkData.nodes)
+            .enter()
+            .append("circle")
+            .attr("class", d => `node ${d.type}`)
+            .attr("r", d => 5 + Math.sqrt(d.degree) * 2)
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
+        
+        // Create labels
+        let showLabels = true;
+        const label = g.append("g")
+            .selectAll("text")
+            .data(networkData.nodes)
+            .enter()
+            .append("text")
+            .attr("class", "node-label")
+            .attr("x", d => d.x)
+            .attr("y", d => d.y - 15)
+            .text(d => d.label)
+            .style("display", d => d.degree > 5 ? "block" : "none");
+        
+        // Update link positions
+        link
+            .attr("x1", d => {
+                const source = networkData.nodes.find(n => n.id === d.source);
+                return source ? source.x : 0;
+            })
+            .attr("y1", d => {
+                const source = networkData.nodes.find(n => n.id === d.source);
+                return source ? source.y : 0;
+            })
+            .attr("x2", d => {
+                const target = networkData.nodes.find(n => n.id === d.target);
+                return target ? target.x : 0;
+            })
+            .attr("y2", d => {
+                const target = networkData.nodes.find(n => n.id === d.target);
+                return target ? target.y : 0;
+            });
+        
+        // Tooltip
+        const tooltip = d3.select("#tooltip");
+        
+        node
+            .on("mouseover", function(event, d) {
+                d3.select(this)
+                    .transition()
+                    .duration(200)
+                    .attr("r", 5 + Math.sqrt(d.degree) * 2 + 3);
+                
+                tooltip
+                    .style("left", (event.pageX + 15) + "px")
+                    .style("top", (event.pageY - 15) + "px")
+                    .classed("visible", true)
+                    .html(`
+                        <div class="tooltip-title">${d.label}</div>
+                        <div>Type: ${d.type === 'user' ? 'User/Channel' : 'Keyword'}</div>
+                        <div>Connections: ${d.degree}</div>
+                    `);
+            })
+            .on("mouseout", function(event, d) {
+                d3.select(this)
+                    .transition()
+                    .duration(200)
+                    .attr("r", 5 + Math.sqrt(d.degree) * 2);
+                
+                tooltip.classed("visible", false);
+            })
+            .on("mousemove", function(event) {
+                tooltip
+                    .style("left", (event.pageX + 15) + "px")
+                    .style("top", (event.pageY - 15) + "px");
+            });
+        
+        // Functions
+        function resetZoom() {
+            svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity);
+        }
+        
+        function toggleLabels() {
+            showLabels = !showLabels;
+            label.style("display", d => {
+                if (!showLabels) return "none";
+                return d.degree > 5 ? "block" : "none";
+            });
+        }
+        
+        // Initial zoom to fit
+        const bounds = g.node().getBBox();
+        const fullWidth = bounds.width;
+        const fullHeight = bounds.height;
+        const midX = bounds.x + fullWidth / 2;
+        const midY = bounds.y + fullHeight / 2;
+        
+        const scale = 0.8 / Math.max(fullWidth / width, fullHeight / height);
+        const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+        
+        svg.call(zoom.transform, d3.zoomIdentity
+            .translate(translate[0], translate[1])
+            .scale(scale));
+    </script>
+</body>
+</html>
