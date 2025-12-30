@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goa 2022 Elections - Advanced Network Analysis</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #header {
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #3498db;
+        }
+        
+        #main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        #sidebar {
+            width: 300px;
+            background: white;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 100;
+        }
+        
+        .panel {
+            padding: 20px;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        
+        .panel-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #search-box {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        #search-box:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        #search-results {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .search-result-item {
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 4px;
+            transition: background 0.2s;
+        }
+        
+        .search-result-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .slider-value {
+            text-align: center;
+            font-weight: 600;
+            color: #3498db;
+            margin-top: 5px;
+            font-size: 13px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            width: 100%;
+            transition: background 0.3s;
+            margin-bottom: 8px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        button.secondary {
+            background: #95a5a6;
+        }
+        
+        button.secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        #viz-container {
+            flex: 1;
+            position: relative;
+            background: white;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .node {
+            cursor: pointer;
+            stroke: white;
+            stroke-width: 2px;
+            transition: stroke-width 0.2s;
+        }
+        
+        .node:hover {
+            stroke: #f39c12;
+            stroke-width: 3px;
+        }
+        
+        .node.highlighted {
+            stroke: #e74c3c;
+            stroke-width: 4px;
+        }
+        
+        .node.dimmed {
+            opacity: 0.2;
+        }
+        
+        .link {
+            stroke: #bdc3c7;
+            stroke-opacity: 0.4;
+            fill: none;
+        }
+        
+        .link.highlighted {
+            stroke: #e74c3c;
+            stroke-opacity: 0.8;
+            stroke-width: 2px;
+        }
+        
+        .link.dimmed {
+            opacity: 0.1;
+        }
+        
+        .node-label {
+            font-size: 11px;
+            font-weight: 500;
+            fill: #2c3e50;
+            pointer-events: none;
+            text-anchor: middle;
+            user-select: none;
+        }
+        
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            max-width: 250px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        #tooltip.visible {
+            opacity: 1;
+        }
+        
+        .tooltip-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #f39c12;
+        }
+        
+        .tooltip-row {
+            margin: 3px 0;
+            font-size: 12px;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            font-size: 12px;
+        }
+        
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .color-mode-toggle {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e1e8ed;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #3498db;
+            font-weight: 600;
+        }
+        
+        .controls-overlay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            background: white;
+            color: #2c3e50;
+            border: 1px solid #e1e8ed;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 14px;
+            width: auto;
+            min-width: auto;
+            transition: all 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: #f8f9fa;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 100%;
+                position: absolute;
+                left: -100%;
+                transition: left 0.3s;
+                height: 100%;
+            }
+            
+            #sidebar.visible {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div class="header-content">
+                <h1>🗳️ Goa Assembly Elections 2022 - Network Analysis</h1>
+                <div class="stats">
+                    <div class="stat">
+                        Nodes: <span class="stat-value" id="visible-nodes">0</span>/<span id="total-nodes">0</span>
+                    </div>
+                    <div class="stat">
+                        Edges: <span class="stat-value" id="visible-edges">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="main-content">
+            <div id="sidebar">
+                <!-- Search Panel -->
+                <div class="panel">
+                    <div class="panel-title">🔍 Search</div>
+                    <input type="text" id="search-box" placeholder="Search nodes...">
+                    <div id="search-results"></div>
+                </div>
+                
+                <!-- Filter Panel -->
+                <div class="panel">
+                    <div class="panel-title">🎯 Filters</div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Node Types:</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="show-users" checked>
+                                <span>Users/Channels</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="show-keywords" checked>
+                                <span>Keywords</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Minimum Connections:</label>
+                        <input type="range" id="degree-slider" min="0" max="50" value="0" step="1">
+                        <div class="slider-value" id="degree-value">0+</div>
+                    </div>
+                </div>
+                
+                <!-- Layout Panel -->
+                <div class="panel">
+                    <div class="panel-title">⚙️ Layout</div>
+                    <button id="start-simulation">▶️ Start Force Layout</button>
+                    <button id="stop-simulation" class="secondary">⏸️ Stop Simulation</button>
+                    <button id="reset-zoom">🔄 Reset View</button>
+                </div>
+                
+                <!-- Color Mode Panel -->
+                <div class="panel">
+                    <div class="panel-title">🎨 Color Mode</div>
+                    <button id="color-by-type">By Type</button>
+                    <button id="color-by-community">By Community</button>
+                </div>
+                
+                <!-- Export Panel -->
+                <div class="panel">
+                    <div class="panel-title">💾 Export</div>
+                    <button id="export-png">📷 Download PNG</button>
+                    <button id="export-svg">📄 Download SVG</button>
+                </div>
+            </div>
+            
+            <div id="viz-container">
+                <div id="loading">Loading network...</div>
+                <svg id="network"></svg>
+                
+                <div class="controls-overlay">
+                    <button class="control-btn" id="toggle-labels" title="Toggle Labels">🏷️</button>
+                    <button class="control-btn" id="zoom-in" title="Zoom In">➕</button>
+                    <button class="control-btn" id="zoom-out" title="Zoom Out">➖</button>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-title">Legend</div>
+                    <div id="legend-content"></div>
+                </div>
+                
+                <div id="tooltip"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Network data
+        const networkData = {"nodes": [{"id": "@odesau2b", "label": "@odesau2b", "type": "unknown", "degree": 1, "community": 6}, {"id": "NDTV", "label": "NDTV", "type": "unknown", "degree": 37, "community": 6}, {"id": "@v9sports384", "label": "@v9sports384", "type": "unknown", "degree": 1, "community": 6}, {"id": "@\u0936\u094d\u0930\u0940\u0915\u0943\u0937\u094d\u0923-\u09229\u0928", "label": "@\u0936\u094d\u0930\u0940\u0915\u0943\u0937\u094d\u0923-\u09229\u0928", "type": "unknown", "degree": 1, "community": 6}, {"id": "@punitsingh6576", "label": "@punitsingh6576", "type": "unknown", "degree": 1, "community": 6}, {"id": "@rakeshime", "label": "@rakeshime", "type": "unknown", "degree": 1, "community": 6}, {"id": "@dabang1534", "label": "@dabang1534", "type": "unknown", "degree": 1, "community": 6}, {"id": "@harshdmc6453", "label": "@harshdmc6453", "type": "unknown", "degree": 1, "community": 6}, {"id": "@ankleshkamble2636", "label": "@ankleshkamble2636", "type": "unknown", "degree": 1, "community": 6}, {"id": "@sheikhaadil04", "label": "@sheikhaadil04", "type": "unknown", "degree": 1, "community": 6}, {"id": "@emiliobello2538", "label": "@emiliobello2538", "type": "unknown", "degree": 1, "community": 6}, {"id": "@shreyashdessai2859", "label": "@shreyashdessai2859", "type": "unknown", "degree": 2, "community": 3}, {"id": "CNN-News18", "label": "CNN-News18", "type": "unknown", "degree": 72, "community": 2}, {"id": "@ghumraArtist", "label": "@ghumraArtist", "type": "unknown", "degree": 1, "community": 2}, {"id": "@chanbormesuting6179", "label": "@chanbormesuting6179", "type": "unknown", "degree": 1, "community": 2}, {"id": "@cesarcabral6484", "label": "@cesarcabral6484", "type": "unknown", "degree": 4, "community": 10}, {"id": "@sanjaynaik8041", "label": "@sanjaynaik8041", "type": "unknown", "degree": 3, "community": 3}, {"id": "@joydsilva9404", "label": "@joydsilva9404", "type": "unknown", "degree": 1, "community": 2}, {"id": "@joaofurtado17", "label": "@joaofurtado17", "type": "unknown", "degree": 1, "community": 2}, {"id": "@jdlfernandes8916", "label": "@jdlfernandes8916", "type": "unknown", "degree": 1, "community": 2}, {"id": "@joanlobo275", "label": "@joanlobo275", "type": "unknown", "degree": 1, "community": 2}, {"id": "@luisfernandes681", "label": "@luisfernandes681", "type": "unknown", "degree": 2, "community": 2}, {"id": "@placydsouza5405", "label": "@placydsouza5405", "type": "unknown", "degree": 3, "community": 2}, {"id": "@vinitagoes4357", "label": "@vinitagoes4357", "type": "unknown", "degree": 1, "community": 2}, {"id": "@beckysouza7883", "label": "@beckysouza7883", "type": "unknown", "degree": 1, "community": 2}, {"id": "@seabreeze234", "label": "@seabreeze234", "type": "unknown", "degree": 2, "community": 2}, {"id": "@victorinocosta5747", "label": "@victorinocosta5747", "type": "unknown", "degree": 2, "community": 2}, {"id": "@antoniosaldanha3294", "label": "@antoniosaldanha3294", "type": "unknown", "degree": 1, "community": 2}, {"id": "@johnfernandes9748", "label": "@johnfernandes9748", "type": "unknown", "degree": 1, "community": 2}, {"id": "@prembhalla9918", "label": "@prembhalla9918", "type": "unknown", "degree": 1, "community": 2}, {"id": "@patriciafernandes4042", "label": "@patriciafernandes4042", "type": "unknown", "degree": 1, "community": 2}, {"id": "@santoshamonker3963", "label": "@santoshamonker3963", "type": "unknown", "degree": 1, "community": 2}, {"id": "@rahuldeshmukh5466", "label": "@rahuldeshmukh5466", "type": "unknown", "degree": 1, "community": 2}, {"id": "@abhishekasthana1911", "label": "@abhishekasthana1911", "type": "unknown", "degree": 1, "community": 2}, {"id": "@nixoncolaco2762", "label": "@nixoncolaco2762", "type": "unknown", "degree": 1, "community": 2}, {"id": "@mistywaters7749", "label": "@mistywaters7749", "type": "unknown", "degree": 1, "community": 2}, {"id": "@piero17y65", "label": "@piero17y65", "type": "unknown", "degree": 1, "community": 2}, {"id": "@nileshnarvekar39", "label": "@nileshnarvekar39", "type": "unknown", "degree": 1, "community": 2}, {"id": "@really6955", "label": "@really6955", "type": "unknown", "degree": 1, "community": 2}, {"id": "@pascoalmartinfernandes3041", "label": "@pascoalmartinfernandes3041", "type": "unknown", "degree": 1, "community": 2}, {"id": "@kavitaparsekar3730", "label": "@kavitaparsekar3730", "type": "unknown", "degree": 1, "community": 2}, {"id": "@jenniferdsa239", "label": "@jenniferdsa239", "type": "unknown", "degree": 1, "community": 2}, {"id": "@gloryj8712", "label": "@gloryj8712", "type": "unknown", "degree": 1, "community": 2}, {"id": "@wilsonfernandes5028", "label": "@wilsonfernandes5028", "type": "unknown", "degree": 1, "community": 2}, {"id": "@aparnamalvankar5329", "label": "@aparnamalvankar5329", "type": "unknown", "degree": 2, "community": 2}, {"id": "@minafernandes8734", "label": "@minafernandes8734", "type": "unknown", "degree": 1, "community": 2}, {"id": "@wilmafernandes8440", "label": "@wilmafernandes8440", "type": "unknown", "degree": 1, "community": 2}, {"id": "@jyanaranjansahoo7824", "label": "@jyanaranjansahoo7824", "type": "unknown", "degree": 1, "community": 2}, {"id": "@olgaperiera1871", "label": "@olgaperiera1871", "type": "unknown", "degree": 1, "community": 2}, {"id": "@melyhenricks9333", "label": "@melyhenricks9333", "type": "unknown", "degree": 1, "community": 2}, {"id": "@milagresrebello8014", "label": "@milagresrebello8014", "type": "unknown", "degree": 1, "community": 2}, {"id": "@rfpgreat9730", "label": "@rfpgreat9730", "type": "unknown", "degree": 1, "community": 2}, {"id": "@VijaySingh-lm8nb", "label": "@VijaySingh-lm8nb", "type": "unknown", "degree": 2, "community": 6}, {"id": "@jeffpereira4200", "label": "@jeffpereira4200", "type": "unknown", "degree": 1, "community": 2}, {"id": "@mariacoutinho1865", "label": "@mariacoutinho1865", "type": "unknown", "degree": 1, "community": 2}, {"id": "@VikasYadav-bx1fj", "label": "@VikasYadav-bx1fj", "type": "unknown", "degree": 1, "community": 2}, {"id": "@AlexSilva-wr7lt", "label": "@AlexSilva-wr7lt", "type": "unknown", "degree": 1, "community": 2}, {"id": "@farrelgracias8730", "label": "@farrelgracias8730", "type": "unknown", "degree": 1, "community": 2}, {"id": "@DANIELGOMES-zh7hv", "label": "@DANIELGOMES-zh7hv", "type": "unknown", "degree": 1, "community": 2}, {"id": "@purushothamganekar3657", "label": "@purushothamganekar3657", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ziyuvlog6355", "label": "@ziyuvlog6355", "type": "unknown", "degree": 1, "community": 8}, {"id": "Aaj Tak", "label": "Aaj Tak", "type": "unknown", "degree": 12, "community": 8}, {"id": "@rakeshchoudhary8055", "label": "@rakeshchoudhary8055", "type": "unknown", "degree": 1, "community": 8}, {"id": "@rdx_Hi_tach_mp3_song_", "label": "@rdx_Hi_tach_mp3_song_", "type": "unknown", "degree": 1, "community": 8}, {"id": "@Its_Sajans", "label": "@Its_Sajans", "type": "unknown", "degree": 1, "community": 8}, {"id": "@royal-fg4cd", "label": "@royal-fg4cd", "type": "unknown", "degree": 1, "community": 8}, {"id": "@mahadeva-1008", "label": "@mahadeva-1008", "type": "unknown", "degree": 2, "community": 8}, {"id": "@onlyaudioshorts4424", "label": "@onlyaudioshorts4424", "type": "unknown", "degree": 1, "community": 8}, {"id": "@evergreenmusic7889", "label": "@evergreenmusic7889", "type": "unknown", "degree": 1, "community": 8}, {"id": "@user-tu8wr2im2q", "label": "@user-tu8wr2im2q", "type": "unknown", "degree": 1, "community": 12}, {"id": "The Indian Express", "label": "The Indian Express", "type": "unknown", "degree": 2, "community": 12}, {"id": "@khorokarkar", "label": "@khorokarkar", "type": "unknown", "degree": 1, "community": 12}, {"id": "@Myworldisgoa", "label": "@Myworldisgoa", "type": "unknown", "degree": 1, "community": 2}, {"id": "@simonmendes1024", "label": "@simonmendes1024", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ashokar2044", "label": "@ashokar2044", "type": "unknown", "degree": 1, "community": 2}, {"id": "@Sk-yi6xj", "label": "@Sk-yi6xj", "type": "unknown", "degree": 2, "community": 2}, {"id": "@abhijityeole2941", "label": "@abhijityeole2941", "type": "unknown", "degree": 1, "community": 8}, {"id": "@kalpanasagar", "label": "@kalpanasagar", "type": "unknown", "degree": 1, "community": 8}, {"id": "@morpal5417", "label": "@morpal5417", "type": "unknown", "degree": 1, "community": 8}, {"id": "@oeoek281", "label": "@oeoek281", "type": "unknown", "degree": 1, "community": 8}, {"id": "@strawhat9319", "label": "@strawhat9319", "type": "unknown", "degree": 1, "community": 0}, {"id": "Republic World", "label": "Republic World", "type": "unknown", "degree": 202, "community": 0}, {"id": "@cameronmiller2073", "label": "@cameronmiller2073", "type": "unknown", "degree": 1, "community": 0}, {"id": "@navinkuckian1926", "label": "@navinkuckian1926", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bekal14ah", "label": "@bekal14ah", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Alok_kumar835", "label": "@Alok_kumar835", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ELECTION-ow4hk", "label": "@ELECTION-ow4hk", "type": "unknown", "degree": 1, "community": 0}, {"id": "@saketdixit728", "label": "@saketdixit728", "type": "unknown", "degree": 1, "community": 0}, {"id": "@prasadmlv8267", "label": "@prasadmlv8267", "type": "unknown", "degree": 1, "community": 0}, {"id": "@phbhondekar7002", "label": "@phbhondekar7002", "type": "unknown", "degree": 1, "community": 0}, {"id": "@pritibenia8292", "label": "@pritibenia8292", "type": "unknown", "degree": 1, "community": 0}, {"id": "@iloveindia8440", "label": "@iloveindia8440", "type": "unknown", "degree": 1, "community": 0}, {"id": "@BrahmaGoud", "label": "@BrahmaGoud", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rajkumarlingi9492", "label": "@rajkumarlingi9492", "type": "unknown", "degree": 1, "community": 0}, {"id": "@dojiyim7104", "label": "@dojiyim7104", "type": "unknown", "degree": 1, "community": 0}, {"id": "@malpalmer3269", "label": "@malpalmer3269", "type": "unknown", "degree": 1, "community": 0}, {"id": "@peterdsouza3122", "label": "@peterdsouza3122", "type": "unknown", "degree": 2, "community": 1}, {"id": "@meenek00", "label": "@meenek00", "type": "unknown", "degree": 1, "community": 0}, {"id": "@vinayakraopasunuru3520", "label": "@vinayakraopasunuru3520", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ayazahmedshaikh7094", "label": "@ayazahmedshaikh7094", "type": "unknown", "degree": 1, "community": 2}, {"id": "@SureshKumar-by2um", "label": "@SureshKumar-by2um", "type": "unknown", "degree": 1, "community": 2}, {"id": "@anilmr1502", "label": "@anilmr1502", "type": "unknown", "degree": 1, "community": 11}, {"id": "Bharatiya Janata Party", "label": "Bharatiya Janata Party", "type": "unknown", "degree": 4, "community": 11}, {"id": "@prasannajain2423", "label": "@prasannajain2423", "type": "unknown", "degree": 1, "community": 11}, {"id": "@AVBB1737", "label": "@AVBB1737", "type": "unknown", "degree": 2, "community": 11}, {"id": "@seanbellfort2298", "label": "@seanbellfort2298", "type": "unknown", "degree": 1, "community": 11}, {"id": "@abhinandan955", "label": "@abhinandan955", "type": "unknown", "degree": 1, "community": 2}, {"id": "@alialii1274", "label": "@alialii1274", "type": "unknown", "degree": 1, "community": 2}, {"id": "@tanmoy1368", "label": "@tanmoy1368", "type": "unknown", "degree": 1, "community": 2}, {"id": "@rajashekarana4125", "label": "@rajashekarana4125", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rajunaik26", "label": "@rajunaik26", "type": "unknown", "degree": 1, "community": 0}, {"id": "@prameeladontula9839", "label": "@prameeladontula9839", "type": "unknown", "degree": 1, "community": 0}, {"id": "@lumeenafernandes4615", "label": "@lumeenafernandes4615", "type": "unknown", "degree": 1, "community": 0}, {"id": "@gkplus2877", "label": "@gkplus2877", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shantiemaharaj2783", "label": "@shantiemaharaj2783", "type": "unknown", "degree": 1, "community": 0}, {"id": "@briannoronha3773", "label": "@briannoronha3773", "type": "unknown", "degree": 1, "community": 2}, {"id": "@omkarrane5867", "label": "@omkarrane5867", "type": "unknown", "degree": 1, "community": 2}, {"id": "@anshumanchoudhary3345", "label": "@anshumanchoudhary3345", "type": "unknown", "degree": 1, "community": 2}, {"id": "@mayan9714", "label": "@mayan9714", "type": "unknown", "degree": 1, "community": 2}, {"id": "@radhikaprabhu4738", "label": "@radhikaprabhu4738", "type": "unknown", "degree": 1, "community": 2}, {"id": "@munfatali861", "label": "@munfatali861", "type": "unknown", "degree": 1, "community": 2}, {"id": "@anthonyfernandes3204", "label": "@anthonyfernandes3204", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ambarishhegde6643", "label": "@ambarishhegde6643", "type": "unknown", "degree": 1, "community": 0}, {"id": "@harindrannair988", "label": "@harindrannair988", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sakthi-f8o", "label": "@sakthi-f8o", "type": "unknown", "degree": 1, "community": 0}, {"id": "@viswas8222", "label": "@viswas8222", "type": "unknown", "degree": 1, "community": 0}, {"id": "@anandbarve5210", "label": "@anandbarve5210", "type": "unknown", "degree": 1, "community": 0}, {"id": "@SussegadGoykar", "label": "@SussegadGoykar", "type": "unknown", "degree": 1, "community": 0}, {"id": "@advaitanundoo3587", "label": "@advaitanundoo3587", "type": "unknown", "degree": 1, "community": 0}, {"id": "@nazarethrebello3241", "label": "@nazarethrebello3241", "type": "unknown", "degree": 1, "community": 0}, {"id": "@peipeikonyaknaga7558", "label": "@peipeikonyaknaga7558", "type": "unknown", "degree": 1, "community": 0}, {"id": "@meenak.3454", "label": "@meenak.3454", "type": "unknown", "degree": 1, "community": 0}, {"id": "@santomiltondesilva3215", "label": "@santomiltondesilva3215", "type": "unknown", "degree": 1, "community": 0}, {"id": "@edwinantao6800", "label": "@edwinantao6800", "type": "unknown", "degree": 1, "community": 0}, {"id": "@barbaradsouza5849", "label": "@barbaradsouza5849", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rex-is9ck", "label": "@rex-is9ck", "type": "unknown", "degree": 2, "community": 1}, {"id": "@user-zp6jc9zu4w", "label": "@user-zp6jc9zu4w", "type": "unknown", "degree": 1, "community": 0}, {"id": "@raw3165", "label": "@raw3165", "type": "unknown", "degree": 1, "community": 0}, {"id": "@vithiatharan3394", "label": "@vithiatharan3394", "type": "unknown", "degree": 1, "community": 0}, {"id": "@aruarbax3258", "label": "@aruarbax3258", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rajendran6394", "label": "@rajendran6394", "type": "unknown", "degree": 1, "community": 0}, {"id": "@agnelopereira1521", "label": "@agnelopereira1521", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rathindranathghosh848", "label": "@rathindranathghosh848", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ruhisharma5610", "label": "@ruhisharma5610", "type": "unknown", "degree": 1, "community": 0}, {"id": "@simonfernandes78", "label": "@simonfernandes78", "type": "unknown", "degree": 1, "community": 0}, {"id": "@pnarayanareddzy6979", "label": "@pnarayanareddzy6979", "type": "unknown", "degree": 1, "community": 0}, {"id": "@nitenderkumar7018", "label": "@nitenderkumar7018", "type": "unknown", "degree": 1, "community": 0}, {"id": "@manishshet3577", "label": "@manishshet3577", "type": "unknown", "degree": 1, "community": 0}, {"id": "@JT-sf4sz", "label": "@JT-sf4sz", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Sainikudu..", "label": "@Sainikudu..", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shankarnarayanan3944", "label": "@shankarnarayanan3944", "type": "unknown", "degree": 1, "community": 0}, {"id": "@aptkp", "label": "@aptkp", "type": "unknown", "degree": 1, "community": 0}, {"id": "@amol929520011", "label": "@amol929520011", "type": "unknown", "degree": 1, "community": 0}, {"id": "@fnudanzngqupi9924", "label": "@fnudanzngqupi9924", "type": "unknown", "degree": 1, "community": 0}, {"id": "@saraswathyv8083", "label": "@saraswathyv8083", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sunainawali1862", "label": "@sunainawali1862", "type": "unknown", "degree": 1, "community": 0}, {"id": "@anuraggoswami777", "label": "@anuraggoswami777", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sandeepdhopeshwarkar1415", "label": "@sandeepdhopeshwarkar1415", "type": "unknown", "degree": 1, "community": 0}, {"id": "@harishshenoy3890", "label": "@harishshenoy3890", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rockyluvinfrnd8180", "label": "@rockyluvinfrnd8180", "type": "unknown", "degree": 1, "community": 0}, {"id": "@csguhan2002", "label": "@csguhan2002", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ashalata1033", "label": "@ashalata1033", "type": "unknown", "degree": 1, "community": 0}, {"id": "@comedy_timepass", "label": "@comedy_timepass", "type": "unknown", "degree": 1, "community": 0}, {"id": "@10_some_guyy_12", "label": "@10_some_guyy_12", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ekdoteenchar7810", "label": "@ekdoteenchar7810", "type": "unknown", "degree": 1, "community": 0}, {"id": "@babutippayikoppa2471", "label": "@babutippayikoppa2471", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Uniquevideos0789", "label": "@Uniquevideos0789", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ashoksawant8547", "label": "@ashoksawant8547", "type": "unknown", "degree": 1, "community": 0}, {"id": "@SS-nh5ng", "label": "@SS-nh5ng", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shaunakgaude315", "label": "@shaunakgaude315", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Tom-qd3cs", "label": "@Tom-qd3cs", "type": "unknown", "degree": 2, "community": 1}, {"id": "@rajanaddanki7765", "label": "@rajanaddanki7765", "type": "unknown", "degree": 2, "community": 1}, {"id": "@sharvilnaik8255", "label": "@sharvilnaik8255", "type": "unknown", "degree": 1, "community": 0}, {"id": "@SS-uf8yq", "label": "@SS-uf8yq", "type": "unknown", "degree": 1, "community": 0}, {"id": "@srrii5242", "label": "@srrii5242", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ggara1377", "label": "@ggara1377", "type": "unknown", "degree": 1, "community": 0}, {"id": "@fitzerald12", "label": "@fitzerald12", "type": "unknown", "degree": 1, "community": 6}, {"id": "@zian7099", "label": "@zian7099", "type": "unknown", "degree": 1, "community": 6}, {"id": "@shreyshirwaikar5954", "label": "@shreyshirwaikar5954", "type": "unknown", "degree": 1, "community": 6}, {"id": "@Modanijhoomla", "label": "@Modanijhoomla", "type": "unknown", "degree": 1, "community": 6}, {"id": "@fromriverstotheseapalestin7030", "label": "@fromriverstotheseapalestin7030", "type": "unknown", "degree": 1, "community": 6}, {"id": "@mr.coelho2293", "label": "@mr.coelho2293", "type": "unknown", "degree": 1, "community": 6}, {"id": "@joelpanceles9083", "label": "@joelpanceles9083", "type": "unknown", "degree": 2, "community": 6}, {"id": "@joelmendonsa4581", "label": "@joelmendonsa4581", "type": "unknown", "degree": 1, "community": 6}, {"id": "@ramup1759", "label": "@ramup1759", "type": "unknown", "degree": 1, "community": 6}, {"id": "@alexcarvalho1748", "label": "@alexcarvalho1748", "type": "unknown", "degree": 1, "community": 6}, {"id": "@samint-skin1076", "label": "@samint-skin1076", "type": "unknown", "degree": 1, "community": 6}, {"id": "@amarendraborah6941", "label": "@amarendraborah6941", "type": "unknown", "degree": 1, "community": 6}, {"id": "@qualityrymbai1514", "label": "@qualityrymbai1514", "type": "unknown", "degree": 1, "community": 6}, {"id": "@railway_king1", "label": "@railway_king1", "type": "unknown", "degree": 1, "community": 6}, {"id": "@aaron7960", "label": "@aaron7960", "type": "unknown", "degree": 1, "community": 6}, {"id": "@AsifAnsari-vn5bh", "label": "@AsifAnsari-vn5bh", "type": "unknown", "degree": 1, "community": 6}, {"id": "@jebakumar2116", "label": "@jebakumar2116", "type": "unknown", "degree": 1, "community": 6}, {"id": "@reece95offical", "label": "@reece95offical", "type": "unknown", "degree": 1, "community": 1}, {"id": "India Today", "label": "India Today", "type": "unknown", "degree": 102, "community": 1}, {"id": "@chawannayak7721", "label": "@chawannayak7721", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sonamthurtop1102", "label": "@sonamthurtop1102", "type": "unknown", "degree": 1, "community": 1}, {"id": "@Truth-Always", "label": "@Truth-Always", "type": "unknown", "degree": 1, "community": 1}, {"id": "@leoleoleo7858", "label": "@leoleoleo7858", "type": "unknown", "degree": 1, "community": 1}, {"id": "@aadeshnayak.baravo9997", "label": "@aadeshnayak.baravo9997", "type": "unknown", "degree": 1, "community": 1}, {"id": "@adrijasaha440", "label": "@adrijasaha440", "type": "unknown", "degree": 1, "community": 1}, {"id": "@gokuldasverekar4576", "label": "@gokuldasverekar4576", "type": "unknown", "degree": 1, "community": 1}, {"id": "@chittadas5724", "label": "@chittadas5724", "type": "unknown", "degree": 1, "community": 1}, {"id": "@pramodKumar-sk7bp", "label": "@pramodKumar-sk7bp", "type": "unknown", "degree": 1, "community": 1}, {"id": "@nijorulz2458", "label": "@nijorulz2458", "type": "unknown", "degree": 1, "community": 1}, {"id": "@jerryjaat7362", "label": "@jerryjaat7362", "type": "unknown", "degree": 1, "community": 1}, {"id": "@bronestarmarboh8438", "label": "@bronestarmarboh8438", "type": "unknown", "degree": 1, "community": 1}, {"id": "@AbulKashem-ry7fl", "label": "@AbulKashem-ry7fl", "type": "unknown", "degree": 2, "community": 1}, {"id": "@snehachari7979", "label": "@snehachari7979", "type": "unknown", "degree": 2, "community": 5}, {"id": "@rohanc9919", "label": "@rohanc9919", "type": "unknown", "degree": 1, "community": 1}, {"id": "@kishatwar", "label": "@kishatwar", "type": "unknown", "degree": 1, "community": 1}, {"id": "@Proroadwalker", "label": "@Proroadwalker", "type": "unknown", "degree": 1, "community": 1}, {"id": "@lovelyindia6367", "label": "@lovelyindia6367", "type": "unknown", "degree": 1, "community": 1}, {"id": "@aparnagude5461", "label": "@aparnagude5461", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sagardessai4948", "label": "@sagardessai4948", "type": "unknown", "degree": 1, "community": 1}, {"id": "@lizadsouza4274", "label": "@lizadsouza4274", "type": "unknown", "degree": 1, "community": 1}, {"id": "@dasilva8612", "label": "@dasilva8612", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sonaligaikwad6387", "label": "@sonaligaikwad6387", "type": "unknown", "degree": 1, "community": 1}, {"id": "@Jaideepsniper", "label": "@Jaideepsniper", "type": "unknown", "degree": 1, "community": 1}, {"id": "@bijayanayak5992", "label": "@bijayanayak5992", "type": "unknown", "degree": 1, "community": 1}, {"id": "@joaquimfernandes530", "label": "@joaquimfernandes530", "type": "unknown", "degree": 1, "community": 1}, {"id": "@konkani365", "label": "@konkani365", "type": "unknown", "degree": 1, "community": 1}, {"id": "@jaishreekrishna3599", "label": "@jaishreekrishna3599", "type": "unknown", "degree": 1, "community": 1}, {"id": "@dakshatamainekar7775", "label": "@dakshatamainekar7775", "type": "unknown", "degree": 1, "community": 1}, {"id": "@samirnevgi8726", "label": "@samirnevgi8726", "type": "unknown", "degree": 1, "community": 1}, {"id": "@robindranathrobindranath7191", "label": "@robindranathrobindranath7191", "type": "unknown", "degree": 1, "community": 1}, {"id": "@tejaswatamwar5650", "label": "@tejaswatamwar5650", "type": "unknown", "degree": 1, "community": 1}, {"id": "@ravindrasahoo486", "label": "@ravindrasahoo486", "type": "unknown", "degree": 1, "community": 1}, {"id": "@fernandes9880", "label": "@fernandes9880", "type": "unknown", "degree": 1, "community": 1}, {"id": "@drawwithme9281", "label": "@drawwithme9281", "type": "unknown", "degree": 1, "community": 1}, {"id": "@nishayadav-fo7cq", "label": "@nishayadav-fo7cq", "type": "unknown", "degree": 1, "community": 1}, {"id": "@deepakwagle5107", "label": "@deepakwagle5107", "type": "unknown", "degree": 1, "community": 1}, {"id": "@Alexander-jd4ip", "label": "@Alexander-jd4ip", "type": "unknown", "degree": 1, "community": 1}, {"id": "@rajking647", "label": "@rajking647", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bharathipai5338", "label": "@bharathipai5338", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bhautikpatelia9514", "label": "@bhautikpatelia9514", "type": "unknown", "degree": 1, "community": 0}, {"id": "@hokatozhimomi1984", "label": "@hokatozhimomi1984", "type": "unknown", "degree": 1, "community": 0}, {"id": "@agroomedman7297", "label": "@agroomedman7297", "type": "unknown", "degree": 1, "community": 0}, {"id": "@r.srinivasan5495", "label": "@r.srinivasan5495", "type": "unknown", "degree": 1, "community": 0}, {"id": "@jivatmakolamkar3192", "label": "@jivatmakolamkar3192", "type": "unknown", "degree": 1, "community": 0}, {"id": "@danielayaya7304", "label": "@danielayaya7304", "type": "unknown", "degree": 1, "community": 0}, {"id": "@swamygsswamygs1221", "label": "@swamygsswamygs1221", "type": "unknown", "degree": 1, "community": 2}, {"id": "@johnvaz3017", "label": "@johnvaz3017", "type": "unknown", "degree": 1, "community": 4}, {"id": "Mojo Story", "label": "Mojo Story", "type": "unknown", "degree": 41, "community": 4}, {"id": "@JJgirls28", "label": "@JJgirls28", "type": "unknown", "degree": 1, "community": 4}, {"id": "@godvinfernandes3643", "label": "@godvinfernandes3643", "type": "unknown", "degree": 1, "community": 4}, {"id": "@sandhyachari2400", "label": "@sandhyachari2400", "type": "unknown", "degree": 1, "community": 4}, {"id": "@franciscoquadros6433", "label": "@franciscoquadros6433", "type": "unknown", "degree": 1, "community": 4}, {"id": "@sujesh4684", "label": "@sujesh4684", "type": "unknown", "degree": 1, "community": 4}, {"id": "@sunitaferrao5288", "label": "@sunitaferrao5288", "type": "unknown", "degree": 1, "community": 4}, {"id": "@florianobarreto3263", "label": "@florianobarreto3263", "type": "unknown", "degree": 1, "community": 4}, {"id": "@jameswanglat2639", "label": "@jameswanglat2639", "type": "unknown", "degree": 1, "community": 4}, {"id": "@bannygoes9750", "label": "@bannygoes9750", "type": "unknown", "degree": 1, "community": 4}, {"id": "@kongusweetie5590", "label": "@kongusweetie5590", "type": "unknown", "degree": 1, "community": 4}, {"id": "@cindydsilva4944", "label": "@cindydsilva4944", "type": "unknown", "degree": 1, "community": 4}, {"id": "@cleretfernandes5972", "label": "@cleretfernandes5972", "type": "unknown", "degree": 1, "community": 4}, {"id": "@thewasp3109", "label": "@thewasp3109", "type": "unknown", "degree": 1, "community": 4}, {"id": "@syedshafat618", "label": "@syedshafat618", "type": "unknown", "degree": 1, "community": 4}, {"id": "@PedroGomes-jj7ug", "label": "@PedroGomes-jj7ug", "type": "unknown", "degree": 1, "community": 4}, {"id": "@UTUBE4819", "label": "@UTUBE4819", "type": "unknown", "degree": 1, "community": 4}, {"id": "@johnbarretto4422", "label": "@johnbarretto4422", "type": "unknown", "degree": 1, "community": 4}, {"id": "@alisonn8818", "label": "@alisonn8818", "type": "unknown", "degree": 1, "community": 4}, {"id": "@sudhirpatil3434", "label": "@sudhirpatil3434", "type": "unknown", "degree": 1, "community": 4}, {"id": "@Gary-wp1wt", "label": "@Gary-wp1wt", "type": "unknown", "degree": 1, "community": 4}, {"id": "@joaosinhosequeira7605", "label": "@joaosinhosequeira7605", "type": "unknown", "degree": 1, "community": 4}, {"id": "@eliasdsouza9398", "label": "@eliasdsouza9398", "type": "unknown", "degree": 1, "community": 4}, {"id": "@nevillecolaco6303", "label": "@nevillecolaco6303", "type": "unknown", "degree": 1, "community": 4}, {"id": "@innocentnature501", "label": "@innocentnature501", "type": "unknown", "degree": 1, "community": 4}, {"id": "@marcelfernandes8371", "label": "@marcelfernandes8371", "type": "unknown", "degree": 1, "community": 4}, {"id": "@ubaldinafernandes4527", "label": "@ubaldinafernandes4527", "type": "unknown", "degree": 1, "community": 4}, {"id": "@Zrodrigues100", "label": "@Zrodrigues100", "type": "unknown", "degree": 1, "community": 4}, {"id": "@caitanoc.cfernandes9426", "label": "@caitanoc.cfernandes9426", "type": "unknown", "degree": 1, "community": 4}, {"id": "@neswinbarreto9592", "label": "@neswinbarreto9592", "type": "unknown", "degree": 1, "community": 4}, {"id": "@galabaga", "label": "@galabaga", "type": "unknown", "degree": 1, "community": 4}, {"id": "@cajetanpedrosa8671", "label": "@cajetanpedrosa8671", "type": "unknown", "degree": 1, "community": 4}, {"id": "@peteralves4292", "label": "@peteralves4292", "type": "unknown", "degree": 1, "community": 4}, {"id": "@bluediamonds6092", "label": "@bluediamonds6092", "type": "unknown", "degree": 1, "community": 4}, {"id": "@dineshlotlikar1061", "label": "@dineshlotlikar1061", "type": "unknown", "degree": 1, "community": 4}, {"id": "@Chanakya50BC", "label": "@Chanakya50BC", "type": "unknown", "degree": 1, "community": 4}, {"id": "@educar2331", "label": "@educar2331", "type": "unknown", "degree": 1, "community": 4}, {"id": "@sagarnaik5719", "label": "@sagarnaik5719", "type": "unknown", "degree": 1, "community": 4}, {"id": "@lancytauro8786", "label": "@lancytauro8786", "type": "unknown", "degree": 1, "community": 4}, {"id": "@vinayakj1033", "label": "@vinayakj1033", "type": "unknown", "degree": 1, "community": 4}, {"id": "@nazariocajey", "label": "@nazariocajey", "type": "unknown", "degree": 1, "community": 4}, {"id": "@jayaggarwal2788", "label": "@jayaggarwal2788", "type": "unknown", "degree": 1, "community": 13}, {"id": "The Economic Times", "label": "The Economic Times", "type": "unknown", "degree": 1, "community": 13}, {"id": "@prashantnaik7991", "label": "@prashantnaik7991", "type": "unknown", "degree": 1, "community": 3}, {"id": "ABP NEWS", "label": "ABP NEWS", "type": "unknown", "degree": 48, "community": 3}, {"id": "@jagannathraikar1766", "label": "@jagannathraikar1766", "type": "unknown", "degree": 1, "community": 3}, {"id": "@Abcnbgvgh583", "label": "@Abcnbgvgh583", "type": "unknown", "degree": 3, "community": 6}, {"id": "@abhinavgupta2658", "label": "@abhinavgupta2658", "type": "unknown", "degree": 1, "community": 3}, {"id": "@umeshnaik9017", "label": "@umeshnaik9017", "type": "unknown", "degree": 1, "community": 3}, {"id": "@zorosryanolemyan1955", "label": "@zorosryanolemyan1955", "type": "unknown", "degree": 1, "community": 3}, {"id": "@amitchari2365", "label": "@amitchari2365", "type": "unknown", "degree": 1, "community": 3}, {"id": "@noircygne4905", "label": "@noircygne4905", "type": "unknown", "degree": 1, "community": 3}, {"id": "@dev_peace_soul", "label": "@dev_peace_soul", "type": "unknown", "degree": 1, "community": 3}, {"id": "@shradhakadam3987", "label": "@shradhakadam3987", "type": "unknown", "degree": 1, "community": 3}, {"id": "@sundramjha9961", "label": "@sundramjha9961", "type": "unknown", "degree": 1, "community": 3}, {"id": "@gouravdas493", "label": "@gouravdas493", "type": "unknown", "degree": 1, "community": 3}, {"id": "@bongo8605", "label": "@bongo8605", "type": "unknown", "degree": 1, "community": 0}, {"id": "@swapnilaraujo", "label": "@swapnilaraujo", "type": "unknown", "degree": 1, "community": 0}, {"id": "@harshawaingankar7278", "label": "@harshawaingankar7278", "type": "unknown", "degree": 1, "community": 0}, {"id": "@pravin32002", "label": "@pravin32002", "type": "unknown", "degree": 1, "community": 0}, {"id": "@narayanansri5142", "label": "@narayanansri5142", "type": "unknown", "degree": 1, "community": 0}, {"id": "@psygabbar5750", "label": "@psygabbar5750", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Asperyourschoise", "label": "@Asperyourschoise", "type": "unknown", "degree": 1, "community": 0}, {"id": "@djkiki6177", "label": "@djkiki6177", "type": "unknown", "degree": 1, "community": 0}, {"id": "@marutanray", "label": "@marutanray", "type": "unknown", "degree": 1, "community": 0}, {"id": "@leenathewise8384", "label": "@leenathewise8384", "type": "unknown", "degree": 1, "community": 0}, {"id": "@clashofclansgaming676", "label": "@clashofclansgaming676", "type": "unknown", "degree": 1, "community": 0}, {"id": "@mehtabalam9981", "label": "@mehtabalam9981", "type": "unknown", "degree": 1, "community": 0}, {"id": "@edwardfernandes4019", "label": "@edwardfernandes4019", "type": "unknown", "degree": 1, "community": 0}, {"id": "@joaordcosta2724", "label": "@joaordcosta2724", "type": "unknown", "degree": 1, "community": 0}, {"id": "@jerryddilva3138", "label": "@jerryddilva3138", "type": "unknown", "degree": 1, "community": 0}, {"id": "@camsmadgaoker2140", "label": "@camsmadgaoker2140", "type": "unknown", "degree": 1, "community": 0}, {"id": "@fevordfernandes7247", "label": "@fevordfernandes7247", "type": "unknown", "degree": 1, "community": 0}, {"id": "@prabirdas8579", "label": "@prabirdas8579", "type": "unknown", "degree": 1, "community": 0}, {"id": "@johnfernandes8643", "label": "@johnfernandes8643", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sovanpani6674", "label": "@sovanpani6674", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bandandkhar4105", "label": "@bandandkhar4105", "type": "unknown", "degree": 1, "community": 0}, {"id": "@lifestyleofsalimshaikh9031", "label": "@lifestyleofsalimshaikh9031", "type": "unknown", "degree": 1, "community": 0}, {"id": "@manavsaburi3993", "label": "@manavsaburi3993", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sannygomes9206", "label": "@sannygomes9206", "type": "unknown", "degree": 1, "community": 0}, {"id": "@salvadorfernandes3194", "label": "@salvadorfernandes3194", "type": "unknown", "degree": 1, "community": 0}, {"id": "@joeydias3028", "label": "@joeydias3028", "type": "unknown", "degree": 1, "community": 0}, {"id": "@zidanepereira7", "label": "@zidanepereira7", "type": "unknown", "degree": 1, "community": 0}, {"id": "@atharvcegh4913", "label": "@atharvcegh4913", "type": "unknown", "degree": 1, "community": 0}, {"id": "@m.b.nagaraj7666", "label": "@m.b.nagaraj7666", "type": "unknown", "degree": 1, "community": 0}, {"id": "@manaulfernas3654", "label": "@manaulfernas3654", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shitiltilve3490", "label": "@shitiltilve3490", "type": "unknown", "degree": 1, "community": 0}, {"id": "@nikhilalvares1020", "label": "@nikhilalvares1020", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sb0403", "label": "@sb0403", "type": "unknown", "degree": 1, "community": 0}, {"id": "@wanderinglife1", "label": "@wanderinglife1", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Jshaila7", "label": "@Jshaila7", "type": "unknown", "degree": 1, "community": 0}, {"id": "@albertlouisfernandes279", "label": "@albertlouisfernandes279", "type": "unknown", "degree": 1, "community": 0}, {"id": "@soumendrachakravarti422", "label": "@soumendrachakravarti422", "type": "unknown", "degree": 1, "community": 0}, {"id": "@irmaoseirmasdegoa7704", "label": "@irmaoseirmasdegoa7704", "type": "unknown", "degree": 1, "community": 0}, {"id": "@dongwhan7033", "label": "@dongwhan7033", "type": "unknown", "degree": 1, "community": 0}, {"id": "@KrugerTim", "label": "@KrugerTim", "type": "unknown", "degree": 1, "community": 9}, {"id": "Indian National Congress", "label": "Indian National Congress", "type": "unknown", "degree": 6, "community": 9}, {"id": "@howareyou4438", "label": "@howareyou4438", "type": "unknown", "degree": 1, "community": 9}, {"id": "@philipdsouza3827", "label": "@philipdsouza3827", "type": "unknown", "degree": 1, "community": 9}, {"id": "@pincodeawara", "label": "@pincodeawara", "type": "unknown", "degree": 1, "community": 9}, {"id": "@niyazahamedshamsi6904", "label": "@niyazahamedshamsi6904", "type": "unknown", "degree": 1, "community": 9}, {"id": "@vanshsuper17", "label": "@vanshsuper17", "type": "unknown", "degree": 1, "community": 9}, {"id": "@HafeezTimber", "label": "@HafeezTimber", "type": "unknown", "degree": 1, "community": 2}, {"id": "@felixfernandes3701", "label": "@felixfernandes3701", "type": "unknown", "degree": 1, "community": 1}, {"id": "@richarddmello4798", "label": "@richarddmello4798", "type": "unknown", "degree": 1, "community": 1}, {"id": "@fidelinapereiramonica8514", "label": "@fidelinapereiramonica8514", "type": "unknown", "degree": 1, "community": 1}, {"id": "@user-vj6tk6gi9v", "label": "@user-vj6tk6gi9v", "type": "unknown", "degree": 1, "community": 1}, {"id": "@drackotrab346", "label": "@drackotrab346", "type": "unknown", "degree": 1, "community": 1}, {"id": "@lourencopereira9218", "label": "@lourencopereira9218", "type": "unknown", "degree": 1, "community": 1}, {"id": "@baptistfernandes2361", "label": "@baptistfernandes2361", "type": "unknown", "degree": 2, "community": 7}, {"id": "@dharmamasiha5813", "label": "@dharmamasiha5813", "type": "unknown", "degree": 1, "community": 1}, {"id": "@joymascarenhas3491", "label": "@joymascarenhas3491", "type": "unknown", "degree": 1, "community": 1}, {"id": "@gaziemdadhossain4402", "label": "@gaziemdadhossain4402", "type": "unknown", "degree": 1, "community": 1}, {"id": "@nickycruz8671", "label": "@nickycruz8671", "type": "unknown", "degree": 1, "community": 1}, {"id": "@genesiuskharnaior747", "label": "@genesiuskharnaior747", "type": "unknown", "degree": 1, "community": 1}, {"id": "@nf5724", "label": "@nf5724", "type": "unknown", "degree": 1, "community": 1}, {"id": "@diogofernandes8617", "label": "@diogofernandes8617", "type": "unknown", "degree": 1, "community": 1}, {"id": "@josesiqueira2742", "label": "@josesiqueira2742", "type": "unknown", "degree": 1, "community": 1}, {"id": "@lastknight391", "label": "@lastknight391", "type": "unknown", "degree": 1, "community": 1}, {"id": "@madhavsanzgiri1838", "label": "@madhavsanzgiri1838", "type": "unknown", "degree": 1, "community": 1}, {"id": "@victorinafernandes6034", "label": "@victorinafernandes6034", "type": "unknown", "degree": 1, "community": 1}, {"id": "@ezeweuwezah5017", "label": "@ezeweuwezah5017", "type": "unknown", "degree": 1, "community": 1}, {"id": "@priyanshuparmar3025", "label": "@priyanshuparmar3025", "type": "unknown", "degree": 1, "community": 1}, {"id": "@josephfernandes2078", "label": "@josephfernandes2078", "type": "unknown", "degree": 1, "community": 1}, {"id": "@arkapravabhattacharjee5066", "label": "@arkapravabhattacharjee5066", "type": "unknown", "degree": 1, "community": 1}, {"id": "@ivandsilva6319", "label": "@ivandsilva6319", "type": "unknown", "degree": 1, "community": 1}, {"id": "@ligoriodsouza1672", "label": "@ligoriodsouza1672", "type": "unknown", "degree": 1, "community": 1}, {"id": "@yvonnepereira9249", "label": "@yvonnepereira9249", "type": "unknown", "degree": 1, "community": 1}, {"id": "@siddeshv8643", "label": "@siddeshv8643", "type": "unknown", "degree": 1, "community": 1}, {"id": "@dr.farmer221", "label": "@dr.farmer221", "type": "unknown", "degree": 1, "community": 1}, {"id": "@vivekanandhakumar5361", "label": "@vivekanandhakumar5361", "type": "unknown", "degree": 1, "community": 1}, {"id": "@mit368", "label": "@mit368", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sanjayburman7908", "label": "@sanjayburman7908", "type": "unknown", "degree": 1, "community": 1}, {"id": "@naveedpalledarshaikh7792", "label": "@naveedpalledarshaikh7792", "type": "unknown", "degree": 1, "community": 1}, {"id": "@mygoawithmathewalmeida3357", "label": "@mygoawithmathewalmeida3357", "type": "unknown", "degree": 1, "community": 1}, {"id": "@catchyboy7787", "label": "@catchyboy7787", "type": "unknown", "degree": 1, "community": 1}, {"id": "@franciscorodrigues10", "label": "@franciscorodrigues10", "type": "unknown", "degree": 1, "community": 1}, {"id": "@premdorjeesherpa1357", "label": "@premdorjeesherpa1357", "type": "unknown", "degree": 1, "community": 1}, {"id": "@heraclitusfernandes6421", "label": "@heraclitusfernandes6421", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sudankhorjuwekar9452", "label": "@sudankhorjuwekar9452", "type": "unknown", "degree": 1, "community": 0}, {"id": "@subhojitroy2202", "label": "@subhojitroy2202", "type": "unknown", "degree": 1, "community": 0}, {"id": "@2009dwine", "label": "@2009dwine", "type": "unknown", "degree": 1, "community": 0}, {"id": "@fatimarodrigues5670", "label": "@fatimarodrigues5670", "type": "unknown", "degree": 1, "community": 0}, {"id": "@jaxjax809", "label": "@jaxjax809", "type": "unknown", "degree": 1, "community": 0}, {"id": "@johnbarber8788", "label": "@johnbarber8788", "type": "unknown", "degree": 1, "community": 0}, {"id": "@aminaabdulla8611", "label": "@aminaabdulla8611", "type": "unknown", "degree": 1, "community": 0}, {"id": "@madhavanmadhavan600", "label": "@madhavanmadhavan600", "type": "unknown", "degree": 1, "community": 0}, {"id": "@MrKumarnath", "label": "@MrKumarnath", "type": "unknown", "degree": 1, "community": 0}, {"id": "@atanumodak1947", "label": "@atanumodak1947", "type": "unknown", "degree": 1, "community": 0}, {"id": "@supremearya", "label": "@supremearya", "type": "unknown", "degree": 1, "community": 0}, {"id": "@franciscodesouza3489", "label": "@franciscodesouza3489", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Bharatiyahindutav", "label": "@Bharatiyahindutav", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sujeetpandey2660", "label": "@sujeetpandey2660", "type": "unknown", "degree": 1, "community": 0}, {"id": "@pralayghosh", "label": "@pralayghosh", "type": "unknown", "degree": 1, "community": 0}, {"id": "@anitamaru2513", "label": "@anitamaru2513", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rmvkamath", "label": "@rmvkamath", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sgup3448", "label": "@sgup3448", "type": "unknown", "degree": 1, "community": 0}, {"id": "@kalpanaguzraty4617", "label": "@kalpanaguzraty4617", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bothamreddy", "label": "@bothamreddy", "type": "unknown", "degree": 1, "community": 0}, {"id": "@realnaveen", "label": "@realnaveen", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ravig1591", "label": "@ravig1591", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Zambia974", "label": "@Zambia974", "type": "unknown", "degree": 1, "community": 0}, {"id": "@huminsaanhi8864", "label": "@huminsaanhi8864", "type": "unknown", "degree": 1, "community": 0}, {"id": "@rameshkulkarni2245", "label": "@rameshkulkarni2245", "type": "unknown", "degree": 1, "community": 0}, {"id": "@jamesgandhi4191", "label": "@jamesgandhi4191", "type": "unknown", "degree": 1, "community": 0}, {"id": "@elborrador333", "label": "@elborrador333", "type": "unknown", "degree": 1, "community": 0}, {"id": "@GrooveSagaTV", "label": "@GrooveSagaTV", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Ananymous_1081", "label": "@Ananymous_1081", "type": "unknown", "degree": 1, "community": 0}, {"id": "@exsecular8157", "label": "@exsecular8157", "type": "unknown", "degree": 1, "community": 0}, {"id": "@vishwas1505", "label": "@vishwas1505", "type": "unknown", "degree": 1, "community": 0}, {"id": "@hautefemme49", "label": "@hautefemme49", "type": "unknown", "degree": 1, "community": 0}, {"id": "@SriPriShreyan", "label": "@SriPriShreyan", "type": "unknown", "degree": 1, "community": 0}, {"id": "@AnonyMous-ht2sl", "label": "@AnonyMous-ht2sl", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shoutout3651", "label": "@shoutout3651", "type": "unknown", "degree": 1, "community": 0}, {"id": "@shobhak7429", "label": "@shobhak7429", "type": "unknown", "degree": 1, "community": 0}, {"id": "@hemantavhad2101", "label": "@hemantavhad2101", "type": "unknown", "degree": 1, "community": 0}, {"id": "@arajananbittapu8204", "label": "@arajananbittapu8204", "type": "unknown", "degree": 1, "community": 0}, {"id": "@likemes6337", "label": "@likemes6337", "type": "unknown", "degree": 1, "community": 0}, {"id": "@girishmesta5819", "label": "@girishmesta5819", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Sambhavi369", "label": "@Sambhavi369", "type": "unknown", "degree": 1, "community": 0}, {"id": "@msmeonlineplatform2251", "label": "@msmeonlineplatform2251", "type": "unknown", "degree": 1, "community": 0}, {"id": "@bd3815", "label": "@bd3815", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ananthapadmanabhan8297", "label": "@ananthapadmanabhan8297", "type": "unknown", "degree": 1, "community": 0}, {"id": "@toor16171", "label": "@toor16171", "type": "unknown", "degree": 1, "community": 5}, {"id": "Aam Aadmi Party", "label": "Aam Aadmi Party", "type": "unknown", "degree": 41, "community": 5}, {"id": "@maheshwadkar3396", "label": "@maheshwadkar3396", "type": "unknown", "degree": 1, "community": 5}, {"id": "@Devilgamer5004-5o", "label": "@Devilgamer5004-5o", "type": "unknown", "degree": 1, "community": 5}, {"id": "@saurabh24", "label": "@saurabh24", "type": "unknown", "degree": 1, "community": 5}, {"id": "@karthikgowda6703", "label": "@karthikgowda6703", "type": "unknown", "degree": 1, "community": 5}, {"id": "@priyankachaurasiya6455", "label": "@priyankachaurasiya6455", "type": "unknown", "degree": 1, "community": 5}, {"id": "@deeps_fr", "label": "@deeps_fr", "type": "unknown", "degree": 1, "community": 5}, {"id": "@ashokthacker4821", "label": "@ashokthacker4821", "type": "unknown", "degree": 1, "community": 5}, {"id": "@zafarColdDrink", "label": "@zafarColdDrink", "type": "unknown", "degree": 1, "community": 5}, {"id": "@arudramaheshwar6310", "label": "@arudramaheshwar6310", "type": "unknown", "degree": 1, "community": 5}, {"id": "@sumanaggarwal7439", "label": "@sumanaggarwal7439", "type": "unknown", "degree": 1, "community": 5}, {"id": "@gauravkapoor3600", "label": "@gauravkapoor3600", "type": "unknown", "degree": 1, "community": 5}, {"id": "@kabhitomuskurao", "label": "@kabhitomuskurao", "type": "unknown", "degree": 1, "community": 5}, {"id": "@babakamdev9008", "label": "@babakamdev9008", "type": "unknown", "degree": 1, "community": 5}, {"id": "@ranbirsingh7960", "label": "@ranbirsingh7960", "type": "unknown", "degree": 1, "community": 5}, {"id": "@ashwanipatel1090", "label": "@ashwanipatel1090", "type": "unknown", "degree": 1, "community": 5}, {"id": "@NeetDropper-cq6xt", "label": "@NeetDropper-cq6xt", "type": "unknown", "degree": 1, "community": 5}, {"id": "@skflyingclub655", "label": "@skflyingclub655", "type": "unknown", "degree": 1, "community": 5}, {"id": "@rajindersinghajimal.85", "label": "@rajindersinghajimal.85", "type": "unknown", "degree": 1, "community": 5}, {"id": "@mhrthkr", "label": "@mhrthkr", "type": "unknown", "degree": 1, "community": 5}, {"id": "@MrSuvanshkapoor", "label": "@MrSuvanshkapoor", "type": "unknown", "degree": 1, "community": 5}, {"id": "@freedomlife9789", "label": "@freedomlife9789", "type": "unknown", "degree": 1, "community": 5}, {"id": "@tanuroy6032", "label": "@tanuroy6032", "type": "unknown", "degree": 1, "community": 5}, {"id": "@dasgupta2231", "label": "@dasgupta2231", "type": "unknown", "degree": 1, "community": 1}, {"id": "@trump5660", "label": "@trump5660", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ghost287r78", "label": "@ghost287r78", "type": "unknown", "degree": 1, "community": 2}, {"id": "@nandapalienkar4185", "label": "@nandapalienkar4185", "type": "unknown", "degree": 1, "community": 2}, {"id": "@akak-um2nv", "label": "@akak-um2nv", "type": "unknown", "degree": 1, "community": 10}, {"id": "Oneindia News", "label": "Oneindia News", "type": "unknown", "degree": 5, "community": 10}, {"id": "@kunalusgaonkar7296", "label": "@kunalusgaonkar7296", "type": "unknown", "degree": 1, "community": 10}, {"id": "@jamesdias7876", "label": "@jamesdias7876", "type": "unknown", "degree": 1, "community": 10}, {"id": "@KhushiShorts4016", "label": "@KhushiShorts4016", "type": "unknown", "degree": 1, "community": 10}, {"id": "@shivrajnaagar5490", "label": "@shivrajnaagar5490", "type": "unknown", "degree": 1, "community": 0}, {"id": "@FVivekBNair", "label": "@FVivekBNair", "type": "unknown", "degree": 1, "community": 0}, {"id": "@VikashSingh-cp6yg", "label": "@VikashSingh-cp6yg", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ajitnaik1024", "label": "@ajitnaik1024", "type": "unknown", "degree": 1, "community": 0}, {"id": "@mystyle7705", "label": "@mystyle7705", "type": "unknown", "degree": 1, "community": 0}, {"id": "@garimakannath6425", "label": "@garimakannath6425", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Onlyone174", "label": "@Onlyone174", "type": "unknown", "degree": 3, "community": 6}, {"id": "@shihabindian", "label": "@shihabindian", "type": "unknown", "degree": 1, "community": 0}, {"id": "@redtongue3499", "label": "@redtongue3499", "type": "unknown", "degree": 1, "community": 0}, {"id": "@csganeshjha", "label": "@csganeshjha", "type": "unknown", "degree": 1, "community": 0}, {"id": "@anandashettyh7671", "label": "@anandashettyh7671", "type": "unknown", "degree": 1, "community": 0}, {"id": "@Official_NashwynArt", "label": "@Official_NashwynArt", "type": "unknown", "degree": 1, "community": 0}, {"id": "@donghuaromance863", "label": "@donghuaromance863", "type": "unknown", "degree": 1, "community": 0}, {"id": "@mohan1771", "label": "@mohan1771", "type": "unknown", "degree": 1, "community": 0}, {"id": "@aahanakhugshal2954", "label": "@aahanakhugshal2954", "type": "unknown", "degree": 1, "community": 0}, {"id": "@ramakantsingh8949", "label": "@ramakantsingh8949", "type": "unknown", "degree": 1, "community": 0}, {"id": "@anu3971", "label": "@anu3971", "type": "unknown", "degree": 1, "community": 0}, {"id": "@eloybranco7506", "label": "@eloybranco7506", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ramp8132", "label": "@ramp8132", "type": "unknown", "degree": 1, "community": 0}, {"id": "@sundeepgambhir492", "label": "@sundeepgambhir492", "type": "unknown", "degree": 1, "community": 0}, {"id": "@madhuranjan7905", "label": "@madhuranjan7905", "type": "unknown", "degree": 1, "community": 0}, {"id": "@kanwaljeetsingh3103", "label": "@kanwaljeetsingh3103", "type": "unknown", "degree": 1, "community": 0}, {"id": "@pankajbaluni7898", "label": "@pankajbaluni7898", "type": "unknown", "degree": 1, "community": 0}, {"id": "@galaxypinto9573", "label": "@galaxypinto9573", "type": "unknown", "degree": 1, "community": 2}, {"id": "@ganeshganesh7262", "label": "@ganeshganesh7262", "type": "unknown", "degree": 1, "community": 2}, {"id": "@swaroopananodkar8283", "label": "@swaroopananodkar8283", "type": "unknown", "degree": 1, "community": 1}, {"id": "@lucaspinto3728", "label": "@lucaspinto3728", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sri12in", "label": "@sri12in", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sudeshchandraagarwal7409", "label": "@sudeshchandraagarwal7409", "type": "unknown", "degree": 1, "community": 1}, {"id": "@sabsab7627", "label": "@sabsab7627", "type": "unknown", "degree": 1, "community": 3}, {"id": "@SM-sg3lv", "label": "@SM-sg3lv", "type": "unknown", "degree": 1, "community": 3}, {"id": "@Mouj-h5o", "label": "@Mouj-h5o", "type": "unknown", "degree": 1, "community": 3}, {"id": "@mariadias1266", "label": "@mariadias1266", "type": "unknown", "degree": 1, "community": 3}, {"id": "@jayantabhaduri2296", "label": "@jayantabhaduri2296", "type": "unknown", "degree": 2, "community": 3}, {"id": "@shaukatmomin9838", "label": "@shaukatmomin9838", "type": "unknown", "degree": 1, "community": 3}, {"id": "@anantkanhake6308", "label": "@anantkanhake6308", "type": "unknown", "degree": 1, "community": 3}, {"id": "@satishvengatangu4332", "label": "@satishvengatangu4332", "type": "unknown", "degree": 1, "community": 3}, {"id": "@chetan9654", "label": "@chetan9654", "type": "unknown", "degree": 1, "community": 3}, {"id": "@Mna418", "label": "@Mna418", "type": "unknown", "degree": 1, "community": 3}, {"id": "@mohanp2535", "label": "@mohanp2535", "type": "unknown", "degree": 1, "community": 3}, {"id": "@TulunaduSafarnama", "label": "@TulunaduSafarnama", "type": "unknown", "degree": 1, "community": 3}, {"id": "@RajKumar-wq7xb", "label": "@RajKumar-wq7xb", "type": "unknown", "degree": 1, "community": 3}, {"id": "@SaddamHusain-sk6my", "label": "@SaddamHusain-sk6my", "type": "unknown", "degree": 1, "community": 3}, {"id": "@lalitkumar9700", "label": "@lalitkumar9700", "type": "unknown", "degree": 1, "community": 3}, {"id": "@codnarcotiger4070", "label": "@codnarcotiger4070", "type": "unknown", "degree": 1, "community": 3}, {"id": "@musicwala7172", "label": "@musicwala7172", "type": "unknown", "degree": 1, "community": 3}, {"id": "@agnelfurtado2831", "label": "@agnelfurtado2831", "type": "unknown", "degree": 1, "community": 3}, {"id": "@ATULKUMAR-qk4do", "label": "@ATULKUMAR-qk4do", "type": "unknown", "degree": 1, "community": 3}, {"id": "@jyotipanse8847", "label": "@jyotipanse8847", "type": "unknown", "degree": 1, "community": 3}, {"id": "@hamzafakhri6501", "label": "@hamzafakhri6501", "type": "unknown", "degree": 1, "community": 3}, {"id": "@cwtsolutions", "label": "@cwtsolutions", "type": "unknown", "degree": 1, "community": 3}, {"id": "@tahirahmad4857", "label": "@tahirahmad4857", "type": "unknown", "degree": 2, "community": 5}, {"id": "@\u0939\u093f\u0928\u094d\u0926\u0942\u092f\u0941\u0935\u093e\u0935\u093e\u0939\u093f\u0928\u0940-\u09258\u0935", "label": "@\u0939\u093f\u0928\u094d\u0926\u0942\u092f\u0941\u0935\u093e\u0935\u093e\u0939\u093f\u0928\u0940-\u09258\u0935", "type": "unknown", "degree": 1, "community": 3}, {"id": "@VIJAY-cq4hz", "label": "@VIJAY-cq4hz", "type": "unknown", "degree": 1, "community": 3}, {"id": "@\u0939\u093f\u0902\u0926\u0942\u0938\u0947\u0928\u093e-\u09182\u0917", "label": "@\u0939\u093f\u0902\u0926\u0942\u0938\u0947\u0928\u093e-\u09182\u0917", "type": "unknown", "degree": 1, "community": 3}, {"id": "@surendersinghrawat682", "label": "@surendersinghrawat682", "type": "unknown", "degree": 1, "community": 3}, {"id": "@indianmilitary4118", "label": "@indianmilitary4118", "type": "unknown", "degree": 1, "community": 3}, {"id": "@\u092c\u091c\u0930\u0902\u0917\u0926\u0932-\u09216\u0939", "label": "@\u092c\u091c\u0930\u0902\u0917\u0926\u0932-\u09216\u0939", "type": "unknown", "degree": 1, "community": 3}, {"id": "@nayankarmakar2198", "label": "@nayankarmakar2198", "type": "unknown", "degree": 1, "community": 3}, {"id": "@mcufanclub8027", "label": "@mcufanclub8027", "type": "unknown", "degree": 1, "community": 3}, {"id": "@mukeshkumargoel9206", "label": "@mukeshkumargoel9206", "type": "unknown", "degree": 1, "community": 3}, {"id": "@SANJAYVN", "label": "@SANJAYVN", "type": "unknown", "degree": 1, "community": 3}, {"id": "@histogram12345", "label": "@histogram12345", "type": "unknown", "degree": 1, "community": 5}, {"id": "@dks4695", "label": "@dks4695", "type": "unknown", "degree": 1, "community": 5}, {"id": "@goemgoenkars2050", "label": "@goemgoenkars2050", "type": "unknown", "degree": 1, "community": 5}, {"id": "@prakashmakawal1998", "label": "@prakashmakawal1998", "type": "unknown", "degree": 1, "community": 5}, {"id": "@suyashkatare4237", "label": "@suyashkatare4237", "type": "unknown", "degree": 1, "community": 5}, {"id": "@preetibaweja2338", "label": "@preetibaweja2338", "type": "unknown", "degree": 1, "community": 5}, {"id": "@\u0939\u092e\u0928\u0939\u0940\u0902\u092d\u0942\u0932\u0947\u0902\u0917\u0947", "label": "@\u0939\u092e\u0928\u0939\u0940\u0902\u092d\u0942\u0932\u0947\u0902\u0917\u0947", "type": "unknown", "degree": 1, "community": 5}, {"id": "@human6729", "label": "@human6729", "type": "unknown", "degree": 1, "community": 5}, {"id": "@HarshKumar-sh7ec", "label": "@HarshKumar-sh7ec", "type": "unknown", "degree": 1, "community": 5}, {"id": "@suryan4206", "label": "@suryan4206", "type": "unknown", "degree": 1, "community": 5}, {"id": "@prave0101", "label": "@prave0101", "type": "unknown", "degree": 1, "community": 5}, {"id": "@kashimsiddiqui8127", "label": "@kashimsiddiqui8127", "type": "unknown", "degree": 1, "community": 5}, {"id": "@vipulbhatnagar1756", "label": "@vipulbhatnagar1756", "type": "unknown", "degree": 1, "community": 5}, {"id": "@bharatbharat949", "label": "@bharatbharat949", "type": "unknown", "degree": 1, "community": 5}, {"id": "@kiranpaljaffri5904", "label": "@kiranpaljaffri5904", "type": "unknown", "degree": 1, "community": 5}, {"id": "@DeepakKumar-oh3bh", "label": "@DeepakKumar-oh3bh", "type": "unknown", "degree": 1, "community": 5}, {"id": "@dhan5102", "label": "@dhan5102", "type": "unknown", "degree": 1, "community": 7}, {"id": "MIRROR NOW", "label": "MIRROR NOW", "type": "unknown", "degree": 15, "community": 7}, {"id": "@samkevin8469", "label": "@samkevin8469", "type": "unknown", "degree": 1, "community": 7}, {"id": "@anandp1012", "label": "@anandp1012", "type": "unknown", "degree": 1, "community": 7}, {"id": "@dilipdixit6105", "label": "@dilipdixit6105", "type": "unknown", "degree": 1, "community": 7}, {"id": "@thenationalist4772", "label": "@thenationalist4772", "type": "unknown", "degree": 1, "community": 7}, {"id": "@dilshad918", "label": "@dilshad918", "type": "unknown", "degree": 1, "community": 7}, {"id": "@007skumarajay", "label": "@007skumarajay", "type": "unknown", "degree": 1, "community": 7}, {"id": "@rameshnayak700", "label": "@rameshnayak700", "type": "unknown", "degree": 1, "community": 7}, {"id": "@Jai.Hind-ME", "label": "@Jai.Hind-ME", "type": "unknown", "degree": 1, "community": 7}, {"id": "@arumugammanivelramar6332", "label": "@arumugammanivelramar6332", "type": "unknown", "degree": 1, "community": 7}, {"id": "@jotendrakumar2852", "label": "@jotendrakumar2852", "type": "unknown", "degree": 1, "community": 7}, {"id": "@francescosivakumaran969", "label": "@francescosivakumaran969", "type": "unknown", "degree": 1, "community": 7}, {"id": "@maurilofernando8752", "label": "@maurilofernando8752", "type": "unknown", "degree": 1, "community": 7}, {"id": "@rajeshsavji4663", "label": "@rajeshsavji4663", "type": "unknown", "degree": 1, "community": 7}, {"id": "@sahilbhavsar8194", "label": "@sahilbhavsar8194", "type": "unknown", "degree": 1, "community": 6}, {"id": "@shyopatduddy7849", "label": "@shyopatduddy7849", "type": "unknown", "degree": 1, "community": 6}, {"id": "@dayanandcl347", "label": "@dayanandcl347", "type": "unknown", "degree": 1, "community": 6}, {"id": "@robbiethegreat8347", "label": "@robbiethegreat8347", "type": "unknown", "degree": 1, "community": 6}, {"id": "@lourdesmenezes1488", "label": "@lourdesmenezes1488", "type": "unknown", "degree": 1, "community": 6}, {"id": "@richardfernandes9553", "label": "@richardfernandes9553", "type": "unknown", "degree": 1, "community": 6}, {"id": "@snehaskitchen6642", "label": "@snehaskitchen6642", "type": "unknown", "degree": 1, "community": 6}, {"id": "@maduraipillai1917", "label": "@maduraipillai1917", "type": "unknown", "degree": 1, "community": 1}, {"id": "@ge4517", "label": "@ge4517", "type": "unknown", "degree": 1, "community": 1}, {"id": "@mukeshbalyan7600", "label": "@mukeshbalyan7600", "type": "unknown", "degree": 1, "community": 1}, {"id": "@artisharma359", "label": "@artisharma359", "type": "unknown", "degree": 1, "community": 1}, {"id": "@rupeshreddy1713", "label": "@rupeshreddy1713", "type": "unknown", "degree": 1, "community": 1}, {"id": "@saviofurtado6999", "label": "@saviofurtado6999", "type": "unknown", "degree": 1, "community": 1}, {"id": "@joaquimsilveira6439", "label": "@joaquimsilveira6439", "type": "unknown", "degree": 1, "community": 1}, {"id": "@identifiedchemistry2371", "label": "@identifiedchemistry2371", "type": "unknown", "degree": 1, "community": 1}, {"id": "@johncyr9124", "label": "@johncyr9124", "type": "unknown", "degree": 1, "community": 1}, {"id": "@antoniofernandes5404", "label": "@antoniofernandes5404", "type": "unknown", "degree": 1, "community": 1}, {"id": "@udennyn", "label": "@udennyn", "type": "unknown", "degree": 1, "community": 1}, {"id": "@rajkapur7429", "label": "@rajkapur7429", "type": "unknown", "degree": 1, "community": 1}, {"id": "@neerajyadav-bh4pr", "label": "@neerajyadav-bh4pr", "type": "unknown", "degree": 1, "community": 1}], "edges": [{"source": "@odesau2b", "target": "NDTV"}, {"source": "@v9sports384", "target": "NDTV"}, {"source": "@\u0936\u094d\u0930\u0940\u0915\u0943\u0937\u094d\u0923-\u09229\u0928", "target": "NDTV"}, {"source": "@punitsingh6576", "target": "NDTV"}, {"source": "@rakeshime", "target": "NDTV"}, {"source": "@dabang1534", "target": "NDTV"}, {"source": "@harshdmc6453", "target": "NDTV"}, {"source": "@ankleshkamble2636", "target": "NDTV"}, {"source": "@sheikhaadil04", "target": "NDTV"}, {"source": "@emiliobello2538", "target": "NDTV"}, {"source": "@shreyashdessai2859", "target": "CNN-News18"}, {"source": "@shreyashdessai2859", "target": "ABP NEWS"}, {"source": "@ghumraArtist", "target": "CNN-News18"}, {"source": "@chanbormesuting6179", "target": "CNN-News18"}, {"source": "@cesarcabral6484", "target": "CNN-News18"}, {"source": "@cesarcabral6484", "target": "Republic World"}, {"source": "@cesarcabral6484", "target": "India Today"}, {"source": "@cesarcabral6484", "target": "Oneindia News"}, {"source": "@sanjaynaik8041", "target": "CNN-News18"}, {"source": "@sanjaynaik8041", "target": "Republic World"}, {"source": "@sanjaynaik8041", "target": "ABP NEWS"}, {"source": "@joydsilva9404", "target": "CNN-News18"}, {"source": "@joaofurtado17", "target": "CNN-News18"}, {"source": "@jdlfernandes8916", "target": "CNN-News18"}, {"source": "@joanlobo275", "target": "CNN-News18"}, {"source": "@luisfernandes681", "target": "CNN-News18"}, {"source": "@luisfernandes681", "target": "India Today"}, {"source": "@placydsouza5405", "target": "CNN-News18"}, {"source": "@placydsouza5405", "target": "India Today"}, {"source": "@placydsouza5405", "target": "Republic World"}, {"source": "@vinitagoes4357", "target": "CNN-News18"}, {"source": "@beckysouza7883", "target": "CNN-News18"}, {"source": "@seabreeze234", "target": "CNN-News18"}, {"source": "@seabreeze234", "target": "Republic World"}, {"source": "@victorinocosta5747", "target": "CNN-News18"}, {"source": "@victorinocosta5747", "target": "Republic World"}, {"source": "@antoniosaldanha3294", "target": "CNN-News18"}, {"source": "@johnfernandes9748", "target": "CNN-News18"}, {"source": "@prembhalla9918", "target": "CNN-News18"}, {"source": "@patriciafernandes4042", "target": "CNN-News18"}, {"source": "@santoshamonker3963", "target": "CNN-News18"}, {"source": "@rahuldeshmukh5466", "target": "CNN-News18"}, {"source": "@abhishekasthana1911", "target": "CNN-News18"}, {"source": "@nixoncolaco2762", "target": "CNN-News18"}, {"source": "@mistywaters7749", "target": "CNN-News18"}, {"source": "@piero17y65", "target": "CNN-News18"}, {"source": "@nileshnarvekar39", "target": "CNN-News18"}, {"source": "@really6955", "target": "CNN-News18"}, {"source": "@pascoalmartinfernandes3041", "target": "CNN-News18"}, {"source": "@kavitaparsekar3730", "target": "CNN-News18"}, {"source": "@jenniferdsa239", "target": "CNN-News18"}, {"source": "@gloryj8712", "target": "CNN-News18"}, {"source": "@wilsonfernandes5028", "target": "CNN-News18"}, {"source": "@aparnamalvankar5329", "target": "CNN-News18"}, {"source": "@aparnamalvankar5329", "target": "Republic World"}, {"source": "@minafernandes8734", "target": "CNN-News18"}, {"source": "@wilmafernandes8440", "target": "CNN-News18"}, {"source": "@jyanaranjansahoo7824", "target": "CNN-News18"}, {"source": "@olgaperiera1871", "target": "CNN-News18"}, {"source": "@melyhenricks9333", "target": "CNN-News18"}, {"source": "@milagresrebello8014", "target": "CNN-News18"}, {"source": "@rfpgreat9730", "target": "CNN-News18"}, {"source": "@VijaySingh-lm8nb", "target": "CNN-News18"}, {"source": "@VijaySingh-lm8nb", "target": "NDTV"}, {"source": "@jeffpereira4200", "target": "CNN-News18"}, {"source": "@mariacoutinho1865", "target": "CNN-News18"}, {"source": "@VikasYadav-bx1fj", "target": "CNN-News18"}, {"source": "@AlexSilva-wr7lt", "target": "CNN-News18"}, {"source": "@farrelgracias8730", "target": "CNN-News18"}, {"source": "@DANIELGOMES-zh7hv", "target": "CNN-News18"}, {"source": "@purushothamganekar3657", "target": "CNN-News18"}, {"source": "@ziyuvlog6355", "target": "Aaj Tak"}, {"source": "@rakeshchoudhary8055", "target": "Aaj Tak"}, {"source": "@rdx_Hi_tach_mp3_song_", "target": "Aaj Tak"}, {"source": "@Its_Sajans", "target": "Aaj Tak"}, {"source": "@royal-fg4cd", "target": "Aaj Tak"}, {"source": "@mahadeva-1008", "target": "Aaj Tak"}, {"source": "@mahadeva-1008", "target": "Republic World"}, {"source": "@onlyaudioshorts4424", "target": "Aaj Tak"}, {"source": "@evergreenmusic7889", "target": "Aaj Tak"}, {"source": "@user-tu8wr2im2q", "target": "The Indian Express"}, {"source": "@khorokarkar", "target": "The Indian Express"}, {"source": "@Myworldisgoa", "target": "CNN-News18"}, {"source": "@simonmendes1024", "target": "CNN-News18"}, {"source": "@ashokar2044", "target": "CNN-News18"}, {"source": "@Sk-yi6xj", "target": "CNN-News18"}, {"source": "@Sk-yi6xj", "target": "Republic World"}, {"source": "@abhijityeole2941", "target": "Aaj Tak"}, {"source": "@kalpanasagar", "target": "Aaj Tak"}, {"source": "@morpal5417", "target": "Aaj Tak"}, {"source": "@oeoek281", "target": "Aaj Tak"}, {"source": "@strawhat9319", "target": "Republic World"}, {"source": "@cameronmiller2073", "target": "Republic World"}, {"source": "@navinkuckian1926", "target": "Republic World"}, {"source": "@bekal14ah", "target": "Republic World"}, {"source": "@Alok_kumar835", "target": "Republic World"}, {"source": "@ELECTION-ow4hk", "target": "Republic World"}, {"source": "@saketdixit728", "target": "Republic World"}, {"source": "@prasadmlv8267", "target": "Republic World"}, {"source": "@phbhondekar7002", "target": "Republic World"}, {"source": "@pritibenia8292", "target": "Republic World"}, {"source": "@iloveindia8440", "target": "Republic World"}, {"source": "@BrahmaGoud", "target": "Republic World"}, {"source": "@rajkumarlingi9492", "target": "Republic World"}, {"source": "@dojiyim7104", "target": "Republic World"}, {"source": "@malpalmer3269", "target": "Republic World"}, {"source": "@peterdsouza3122", "target": "Republic World"}, {"source": "@peterdsouza3122", "target": "India Today"}, {"source": "@meenek00", "target": "Republic World"}, {"source": "@vinayakraopasunuru3520", "target": "Republic World"}, {"source": "@ayazahmedshaikh7094", "target": "CNN-News18"}, {"source": "@SureshKumar-by2um", "target": "CNN-News18"}, {"source": "@anilmr1502", "target": "Bharatiya Janata Party"}, {"source": "@prasannajain2423", "target": "Bharatiya Janata Party"}, {"source": "@AVBB1737", "target": "Bharatiya Janata Party"}, {"source": "@AVBB1737", "target": "Republic World"}, {"source": "@seanbellfort2298", "target": "Bharatiya Janata Party"}, {"source": "@abhinandan955", "target": "CNN-News18"}, {"source": "@alialii1274", "target": "CNN-News18"}, {"source": "@tanmoy1368", "target": "CNN-News18"}, {"source": "@rajashekarana4125", "target": "Republic World"}, {"source": "@rajunaik26", "target": "Republic World"}, {"source": "@prameeladontula9839", "target": "Republic World"}, {"source": "@lumeenafernandes4615", "target": "Republic World"}, {"source": "@gkplus2877", "target": "Republic World"}, {"source": "@shantiemaharaj2783", "target": "Republic World"}, {"source": "@briannoronha3773", "target": "CNN-News18"}, {"source": "@omkarrane5867", "target": "CNN-News18"}, {"source": "@anshumanchoudhary3345", "target": "CNN-News18"}, {"source": "@mayan9714", "target": "CNN-News18"}, {"source": "@radhikaprabhu4738", "target": "CNN-News18"}, {"source": "@munfatali861", "target": "CNN-News18"}, {"source": "@anthonyfernandes3204", "target": "CNN-News18"}, {"source": "@ambarishhegde6643", "target": "Republic World"}, {"source": "@harindrannair988", "target": "Republic World"}, {"source": "@sakthi-f8o", "target": "Republic World"}, {"source": "@viswas8222", "target": "Republic World"}, {"source": "@anandbarve5210", "target": "Republic World"}, {"source": "@SussegadGoykar", "target": "Republic World"}, {"source": "@advaitanundoo3587", "target": "Republic World"}, {"source": "@nazarethrebello3241", "target": "Republic World"}, {"source": "@peipeikonyaknaga7558", "target": "Republic World"}, {"source": "@meenak.3454", "target": "Republic World"}, {"source": "@santomiltondesilva3215", "target": "Republic World"}, {"source": "@edwinantao6800", "target": "Republic World"}, {"source": "@barbaradsouza5849", "target": "Republic World"}, {"source": "@rex-is9ck", "target": "Republic World"}, {"source": "@rex-is9ck", "target": "India Today"}, {"source": "@user-zp6jc9zu4w", "target": "Republic World"}, {"source": "@raw3165", "target": "Republic World"}, {"source": "@vithiatharan3394", "target": "Republic World"}, {"source": "@aruarbax3258", "target": "Republic World"}, {"source": "@rajendran6394", "target": "Republic World"}, {"source": "@agnelopereira1521", "target": "Republic World"}, {"source": "@rathindranathghosh848", "target": "Republic World"}, {"source": "@ruhisharma5610", "target": "Republic World"}, {"source": "@simonfernandes78", "target": "Republic World"}, {"source": "@pnarayanareddzy6979", "target": "Republic World"}, {"source": "@nitenderkumar7018", "target": "Republic World"}, {"source": "@manishshet3577", "target": "Republic World"}, {"source": "@JT-sf4sz", "target": "Republic World"}, {"source": "@Sainikudu..", "target": "Republic World"}, {"source": "@shankarnarayanan3944", "target": "Republic World"}, {"source": "@aptkp", "target": "Republic World"}, {"source": "@amol929520011", "target": "Republic World"}, {"source": "@fnudanzngqupi9924", "target": "Republic World"}, {"source": "@saraswathyv8083", "target": "Republic World"}, {"source": "@sunainawali1862", "target": "Republic World"}, {"source": "@anuraggoswami777", "target": "Republic World"}, {"source": "@sandeepdhopeshwarkar1415", "target": "Republic World"}, {"source": "@harishshenoy3890", "target": "Republic World"}, {"source": "@rockyluvinfrnd8180", "target": "Republic World"}, {"source": "@csguhan2002", "target": "Republic World"}, {"source": "@ashalata1033", "target": "Republic World"}, {"source": "@comedy_timepass", "target": "Republic World"}, {"source": "@10_some_guyy_12", "target": "Republic World"}, {"source": "@ekdoteenchar7810", "target": "Republic World"}, {"source": "@babutippayikoppa2471", "target": "Republic World"}, {"source": "@Uniquevideos0789", "target": "Republic World"}, {"source": "@ashoksawant8547", "target": "Republic World"}, {"source": "@SS-nh5ng", "target": "Republic World"}, {"source": "@shaunakgaude315", "target": "Republic World"}, {"source": "@Tom-qd3cs", "target": "Republic World"}, {"source": "@Tom-qd3cs", "target": "India Today"}, {"source": "@rajanaddanki7765", "target": "Republic World"}, {"source": "@rajanaddanki7765", "target": "India Today"}, {"source": "@sharvilnaik8255", "target": "Republic World"}, {"source": "@SS-uf8yq", "target": "Republic World"}, {"source": "@srrii5242", "target": "Republic World"}, {"source": "@ggara1377", "target": "Republic World"}, {"source": "@fitzerald12", "target": "NDTV"}, {"source": "@zian7099", "target": "NDTV"}, {"source": "@shreyshirwaikar5954", "target": "NDTV"}, {"source": "@Modanijhoomla", "target": "NDTV"}, {"source": "@fromriverstotheseapalestin7030", "target": "NDTV"}, {"source": "@mr.coelho2293", "target": "NDTV"}, {"source": "@joelpanceles9083", "target": "NDTV"}, {"source": "@joelpanceles9083", "target": "India Today"}, {"source": "@joelmendonsa4581", "target": "NDTV"}, {"source": "@ramup1759", "target": "NDTV"}, {"source": "@alexcarvalho1748", "target": "NDTV"}, {"source": "@samint-skin1076", "target": "NDTV"}, {"source": "@amarendraborah6941", "target": "NDTV"}, {"source": "@qualityrymbai1514", "target": "NDTV"}, {"source": "@railway_king1", "target": "NDTV"}, {"source": "@aaron7960", "target": "NDTV"}, {"source": "@AsifAnsari-vn5bh", "target": "NDTV"}, {"source": "@jebakumar2116", "target": "NDTV"}, {"source": "@reece95offical", "target": "India Today"}, {"source": "@chawannayak7721", "target": "India Today"}, {"source": "@sonamthurtop1102", "target": "India Today"}, {"source": "@Truth-Always", "target": "India Today"}, {"source": "@leoleoleo7858", "target": "India Today"}, {"source": "@aadeshnayak.baravo9997", "target": "India Today"}, {"source": "@adrijasaha440", "target": "India Today"}, {"source": "@gokuldasverekar4576", "target": "India Today"}, {"source": "@chittadas5724", "target": "India Today"}, {"source": "@pramodKumar-sk7bp", "target": "India Today"}, {"source": "@nijorulz2458", "target": "India Today"}, {"source": "@jerryjaat7362", "target": "India Today"}, {"source": "@bronestarmarboh8438", "target": "India Today"}, {"source": "@AbulKashem-ry7fl", "target": "India Today"}, {"source": "@AbulKashem-ry7fl", "target": "Republic World"}, {"source": "@snehachari7979", "target": "India Today"}, {"source": "@snehachari7979", "target": "Aam Aadmi Party"}, {"source": "@rohanc9919", "target": "India Today"}, {"source": "@kishatwar", "target": "India Today"}, {"source": "@Proroadwalker", "target": "India Today"}, {"source": "@lovelyindia6367", "target": "India Today"}, {"source": "@aparnagude5461", "target": "India Today"}, {"source": "@sagardessai4948", "target": "India Today"}, {"source": "@lizadsouza4274", "target": "India Today"}, {"source": "@dasilva8612", "target": "India Today"}, {"source": "@sonaligaikwad6387", "target": "India Today"}, {"source": "@Jaideepsniper", "target": "India Today"}, {"source": "@bijayanayak5992", "target": "India Today"}, {"source": "@joaquimfernandes530", "target": "India Today"}, {"source": "@konkani365", "target": "India Today"}, {"source": "@jaishreekrishna3599", "target": "India Today"}, {"source": "@dakshatamainekar7775", "target": "India Today"}, {"source": "@samirnevgi8726", "target": "India Today"}, {"source": "@robindranathrobindranath7191", "target": "India Today"}, {"source": "@tejaswatamwar5650", "target": "India Today"}, {"source": "@ravindrasahoo486", "target": "India Today"}, {"source": "@fernandes9880", "target": "India Today"}, {"source": "@drawwithme9281", "target": "India Today"}, {"source": "@nishayadav-fo7cq", "target": "India Today"}, {"source": "@deepakwagle5107", "target": "India Today"}, {"source": "@Alexander-jd4ip", "target": "India Today"}, {"source": "@rajking647", "target": "Republic World"}, {"source": "@bharathipai5338", "target": "Republic World"}, {"source": "@bhautikpatelia9514", "target": "Republic World"}, {"source": "@hokatozhimomi1984", "target": "Republic World"}, {"source": "@agroomedman7297", "target": "Republic World"}, {"source": "@r.srinivasan5495", "target": "Republic World"}, {"source": "@jivatmakolamkar3192", "target": "Republic World"}, {"source": "@danielayaya7304", "target": "Republic World"}, {"source": "@swamygsswamygs1221", "target": "CNN-News18"}, {"source": "@johnvaz3017", "target": "Mojo Story"}, {"source": "@JJgirls28", "target": "Mojo Story"}, {"source": "@godvinfernandes3643", "target": "Mojo Story"}, {"source": "@sandhyachari2400", "target": "Mojo Story"}, {"source": "@franciscoquadros6433", "target": "Mojo Story"}, {"source": "@sujesh4684", "target": "Mojo Story"}, {"source": "@sunitaferrao5288", "target": "Mojo Story"}, {"source": "@florianobarreto3263", "target": "Mojo Story"}, {"source": "@jameswanglat2639", "target": "Mojo Story"}, {"source": "@bannygoes9750", "target": "Mojo Story"}, {"source": "@kongusweetie5590", "target": "Mojo Story"}, {"source": "@cindydsilva4944", "target": "Mojo Story"}, {"source": "@cleretfernandes5972", "target": "Mojo Story"}, {"source": "@thewasp3109", "target": "Mojo Story"}, {"source": "@syedshafat618", "target": "Mojo Story"}, {"source": "@PedroGomes-jj7ug", "target": "Mojo Story"}, {"source": "@UTUBE4819", "target": "Mojo Story"}, {"source": "@johnbarretto4422", "target": "Mojo Story"}, {"source": "@alisonn8818", "target": "Mojo Story"}, {"source": "@sudhirpatil3434", "target": "Mojo Story"}, {"source": "@Gary-wp1wt", "target": "Mojo Story"}, {"source": "@joaosinhosequeira7605", "target": "Mojo Story"}, {"source": "@eliasdsouza9398", "target": "Mojo Story"}, {"source": "@nevillecolaco6303", "target": "Mojo Story"}, {"source": "@innocentnature501", "target": "Mojo Story"}, {"source": "@marcelfernandes8371", "target": "Mojo Story"}, {"source": "@ubaldinafernandes4527", "target": "Mojo Story"}, {"source": "@Zrodrigues100", "target": "Mojo Story"}, {"source": "@caitanoc.cfernandes9426", "target": "Mojo Story"}, {"source": "@neswinbarreto9592", "target": "Mojo Story"}, {"source": "@galabaga", "target": "Mojo Story"}, {"source": "@cajetanpedrosa8671", "target": "Mojo Story"}, {"source": "@peteralves4292", "target": "Mojo Story"}, {"source": "@bluediamonds6092", "target": "Mojo Story"}, {"source": "@dineshlotlikar1061", "target": "Mojo Story"}, {"source": "@Chanakya50BC", "target": "Mojo Story"}, {"source": "@educar2331", "target": "Mojo Story"}, {"source": "@sagarnaik5719", "target": "Mojo Story"}, {"source": "@lancytauro8786", "target": "Mojo Story"}, {"source": "@vinayakj1033", "target": "Mojo Story"}, {"source": "@nazariocajey", "target": "Mojo Story"}, {"source": "@jayaggarwal2788", "target": "The Economic Times"}, {"source": "@prashantnaik7991", "target": "ABP NEWS"}, {"source": "@jagannathraikar1766", "target": "ABP NEWS"}, {"source": "@Abcnbgvgh583", "target": "ABP NEWS"}, {"source": "@Abcnbgvgh583", "target": "Republic World"}, {"source": "@Abcnbgvgh583", "target": "NDTV"}, {"source": "@abhinavgupta2658", "target": "ABP NEWS"}, {"source": "@umeshnaik9017", "target": "ABP NEWS"}, {"source": "@zorosryanolemyan1955", "target": "ABP NEWS"}, {"source": "@amitchari2365", "target": "ABP NEWS"}, {"source": "@noircygne4905", "target": "ABP NEWS"}, {"source": "@dev_peace_soul", "target": "ABP NEWS"}, {"source": "@shradhakadam3987", "target": "ABP NEWS"}, {"source": "@sundramjha9961", "target": "ABP NEWS"}, {"source": "@gouravdas493", "target": "ABP NEWS"}, {"source": "@bongo8605", "target": "Republic World"}, {"source": "@swapnilaraujo", "target": "Republic World"}, {"source": "@harshawaingankar7278", "target": "Republic World"}, {"source": "@pravin32002", "target": "Republic World"}, {"source": "@narayanansri5142", "target": "Republic World"}, {"source": "@psygabbar5750", "target": "Republic World"}, {"source": "@Asperyourschoise", "target": "Republic World"}, {"source": "@djkiki6177", "target": "Republic World"}, {"source": "@marutanray", "target": "Republic World"}, {"source": "@leenathewise8384", "target": "Republic World"}, {"source": "@clashofclansgaming676", "target": "Republic World"}, {"source": "@mehtabalam9981", "target": "Republic World"}, {"source": "@edwardfernandes4019", "target": "Republic World"}, {"source": "@joaordcosta2724", "target": "Republic World"}, {"source": "@jerryddilva3138", "target": "Republic World"}, {"source": "@camsmadgaoker2140", "target": "Republic World"}, {"source": "@fevordfernandes7247", "target": "Republic World"}, {"source": "@prabirdas8579", "target": "Republic World"}, {"source": "@johnfernandes8643", "target": "Republic World"}, {"source": "@sovanpani6674", "target": "Republic World"}, {"source": "@bandandkhar4105", "target": "Republic World"}, {"source": "@lifestyleofsalimshaikh9031", "target": "Republic World"}, {"source": "@manavsaburi3993", "target": "Republic World"}, {"source": "@sannygomes9206", "target": "Republic World"}, {"source": "@salvadorfernandes3194", "target": "Republic World"}, {"source": "@joeydias3028", "target": "Republic World"}, {"source": "@zidanepereira7", "target": "Republic World"}, {"source": "@atharvcegh4913", "target": "Republic World"}, {"source": "@m.b.nagaraj7666", "target": "Republic World"}, {"source": "@manaulfernas3654", "target": "Republic World"}, {"source": "@shitiltilve3490", "target": "Republic World"}, {"source": "@nikhilalvares1020", "target": "Republic World"}, {"source": "@sb0403", "target": "Republic World"}, {"source": "@wanderinglife1", "target": "Republic World"}, {"source": "@Jshaila7", "target": "Republic World"}, {"source": "@albertlouisfernandes279", "target": "Republic World"}, {"source": "@soumendrachakravarti422", "target": "Republic World"}, {"source": "@irmaoseirmasdegoa7704", "target": "Republic World"}, {"source": "@dongwhan7033", "target": "Republic World"}, {"source": "@KrugerTim", "target": "Indian National Congress"}, {"source": "@howareyou4438", "target": "Indian National Congress"}, {"source": "@philipdsouza3827", "target": "Indian National Congress"}, {"source": "@pincodeawara", "target": "Indian National Congress"}, {"source": "@niyazahamedshamsi6904", "target": "Indian National Congress"}, {"source": "@vanshsuper17", "target": "Indian National Congress"}, {"source": "@HafeezTimber", "target": "CNN-News18"}, {"source": "@felixfernandes3701", "target": "India Today"}, {"source": "@richarddmello4798", "target": "India Today"}, {"source": "@fidelinapereiramonica8514", "target": "India Today"}, {"source": "@user-vj6tk6gi9v", "target": "India Today"}, {"source": "@drackotrab346", "target": "India Today"}, {"source": "@lourencopereira9218", "target": "India Today"}, {"source": "@baptistfernandes2361", "target": "India Today"}, {"source": "@baptistfernandes2361", "target": "MIRROR NOW"}, {"source": "@dharmamasiha5813", "target": "India Today"}, {"source": "@joymascarenhas3491", "target": "India Today"}, {"source": "@gaziemdadhossain4402", "target": "India Today"}, {"source": "@nickycruz8671", "target": "India Today"}, {"source": "@genesiuskharnaior747", "target": "India Today"}, {"source": "@nf5724", "target": "India Today"}, {"source": "@diogofernandes8617", "target": "India Today"}, {"source": "@josesiqueira2742", "target": "India Today"}, {"source": "@lastknight391", "target": "India Today"}, {"source": "@madhavsanzgiri1838", "target": "India Today"}, {"source": "@victorinafernandes6034", "target": "India Today"}, {"source": "@ezeweuwezah5017", "target": "India Today"}, {"source": "@priyanshuparmar3025", "target": "India Today"}, {"source": "@josephfernandes2078", "target": "India Today"}, {"source": "@arkapravabhattacharjee5066", "target": "India Today"}, {"source": "@ivandsilva6319", "target": "India Today"}, {"source": "@ligoriodsouza1672", "target": "India Today"}, {"source": "@yvonnepereira9249", "target": "India Today"}, {"source": "@siddeshv8643", "target": "India Today"}, {"source": "@dr.farmer221", "target": "India Today"}, {"source": "@vivekanandhakumar5361", "target": "India Today"}, {"source": "@mit368", "target": "India Today"}, {"source": "@sanjayburman7908", "target": "India Today"}, {"source": "@naveedpalledarshaikh7792", "target": "India Today"}, {"source": "@mygoawithmathewalmeida3357", "target": "India Today"}, {"source": "@catchyboy7787", "target": "India Today"}, {"source": "@franciscorodrigues10", "target": "India Today"}, {"source": "@premdorjeesherpa1357", "target": "India Today"}, {"source": "@heraclitusfernandes6421", "target": "India Today"}, {"source": "@sudankhorjuwekar9452", "target": "Republic World"}, {"source": "@subhojitroy2202", "target": "Republic World"}, {"source": "@2009dwine", "target": "Republic World"}, {"source": "@fatimarodrigues5670", "target": "Republic World"}, {"source": "@jaxjax809", "target": "Republic World"}, {"source": "@johnbarber8788", "target": "Republic World"}, {"source": "@aminaabdulla8611", "target": "Republic World"}, {"source": "@madhavanmadhavan600", "target": "Republic World"}, {"source": "@MrKumarnath", "target": "Republic World"}, {"source": "@atanumodak1947", "target": "Republic World"}, {"source": "@supremearya", "target": "Republic World"}, {"source": "@franciscodesouza3489", "target": "Republic World"}, {"source": "@Bharatiyahindutav", "target": "Republic World"}, {"source": "@sujeetpandey2660", "target": "Republic World"}, {"source": "@pralayghosh", "target": "Republic World"}, {"source": "@anitamaru2513", "target": "Republic World"}, {"source": "@rmvkamath", "target": "Republic World"}, {"source": "@sgup3448", "target": "Republic World"}, {"source": "@kalpanaguzraty4617", "target": "Republic World"}, {"source": "@bothamreddy", "target": "Republic World"}, {"source": "@realnaveen", "target": "Republic World"}, {"source": "@ravig1591", "target": "Republic World"}, {"source": "@Zambia974", "target": "Republic World"}, {"source": "@huminsaanhi8864", "target": "Republic World"}, {"source": "@rameshkulkarni2245", "target": "Republic World"}, {"source": "@jamesgandhi4191", "target": "Republic World"}, {"source": "@elborrador333", "target": "Republic World"}, {"source": "@GrooveSagaTV", "target": "Republic World"}, {"source": "@Ananymous_1081", "target": "Republic World"}, {"source": "@exsecular8157", "target": "Republic World"}, {"source": "@vishwas1505", "target": "Republic World"}, {"source": "@hautefemme49", "target": "Republic World"}, {"source": "@SriPriShreyan", "target": "Republic World"}, {"source": "@AnonyMous-ht2sl", "target": "Republic World"}, {"source": "@shoutout3651", "target": "Republic World"}, {"source": "@shobhak7429", "target": "Republic World"}, {"source": "@hemantavhad2101", "target": "Republic World"}, {"source": "@arajananbittapu8204", "target": "Republic World"}, {"source": "@likemes6337", "target": "Republic World"}, {"source": "@girishmesta5819", "target": "Republic World"}, {"source": "@Sambhavi369", "target": "Republic World"}, {"source": "@msmeonlineplatform2251", "target": "Republic World"}, {"source": "@bd3815", "target": "Republic World"}, {"source": "@ananthapadmanabhan8297", "target": "Republic World"}, {"source": "@toor16171", "target": "Aam Aadmi Party"}, {"source": "@maheshwadkar3396", "target": "Aam Aadmi Party"}, {"source": "@Devilgamer5004-5o", "target": "Aam Aadmi Party"}, {"source": "@saurabh24", "target": "Aam Aadmi Party"}, {"source": "@karthikgowda6703", "target": "Aam Aadmi Party"}, {"source": "@priyankachaurasiya6455", "target": "Aam Aadmi Party"}, {"source": "@deeps_fr", "target": "Aam Aadmi Party"}, {"source": "@ashokthacker4821", "target": "Aam Aadmi Party"}, {"source": "@zafarColdDrink", "target": "Aam Aadmi Party"}, {"source": "@arudramaheshwar6310", "target": "Aam Aadmi Party"}, {"source": "@sumanaggarwal7439", "target": "Aam Aadmi Party"}, {"source": "@gauravkapoor3600", "target": "Aam Aadmi Party"}, {"source": "@kabhitomuskurao", "target": "Aam Aadmi Party"}, {"source": "@babakamdev9008", "target": "Aam Aadmi Party"}, {"source": "@ranbirsingh7960", "target": "Aam Aadmi Party"}, {"source": "@ashwanipatel1090", "target": "Aam Aadmi Party"}, {"source": "@NeetDropper-cq6xt", "target": "Aam Aadmi Party"}, {"source": "@skflyingclub655", "target": "Aam Aadmi Party"}, {"source": "@rajindersinghajimal.85", "target": "Aam Aadmi Party"}, {"source": "@mhrthkr", "target": "Aam Aadmi Party"}, {"source": "@MrSuvanshkapoor", "target": "Aam Aadmi Party"}, {"source": "@freedomlife9789", "target": "Aam Aadmi Party"}, {"source": "@tanuroy6032", "target": "Aam Aadmi Party"}, {"source": "@dasgupta2231", "target": "India Today"}, {"source": "@trump5660", "target": "CNN-News18"}, {"source": "@ghost287r78", "target": "CNN-News18"}, {"source": "@nandapalienkar4185", "target": "CNN-News18"}, {"source": "@akak-um2nv", "target": "Oneindia News"}, {"source": "@kunalusgaonkar7296", "target": "Oneindia News"}, {"source": "@jamesdias7876", "target": "Oneindia News"}, {"source": "@KhushiShorts4016", "target": "Oneindia News"}, {"source": "@shivrajnaagar5490", "target": "Republic World"}, {"source": "@FVivekBNair", "target": "Republic World"}, {"source": "@VikashSingh-cp6yg", "target": "Republic World"}, {"source": "@ajitnaik1024", "target": "Republic World"}, {"source": "@mystyle7705", "target": "Republic World"}, {"source": "@garimakannath6425", "target": "Republic World"}, {"source": "@Onlyone174", "target": "Republic World"}, {"source": "@Onlyone174", "target": "ABP NEWS"}, {"source": "@Onlyone174", "target": "NDTV"}, {"source": "@shihabindian", "target": "Republic World"}, {"source": "@redtongue3499", "target": "Republic World"}, {"source": "@csganeshjha", "target": "Republic World"}, {"source": "@anandashettyh7671", "target": "Republic World"}, {"source": "@Official_NashwynArt", "target": "Republic World"}, {"source": "@donghuaromance863", "target": "Republic World"}, {"source": "@mohan1771", "target": "Republic World"}, {"source": "@aahanakhugshal2954", "target": "Republic World"}, {"source": "@ramakantsingh8949", "target": "Republic World"}, {"source": "@anu3971", "target": "Republic World"}, {"source": "@eloybranco7506", "target": "CNN-News18"}, {"source": "@ramp8132", "target": "Republic World"}, {"source": "@sundeepgambhir492", "target": "Republic World"}, {"source": "@madhuranjan7905", "target": "Republic World"}, {"source": "@kanwaljeetsingh3103", "target": "Republic World"}, {"source": "@pankajbaluni7898", "target": "Republic World"}, {"source": "@galaxypinto9573", "target": "CNN-News18"}, {"source": "@ganeshganesh7262", "target": "CNN-News18"}, {"source": "@swaroopananodkar8283", "target": "India Today"}, {"source": "@lucaspinto3728", "target": "India Today"}, {"source": "@sri12in", "target": "India Today"}, {"source": "@sudeshchandraagarwal7409", "target": "India Today"}, {"source": "@sabsab7627", "target": "ABP NEWS"}, {"source": "@SM-sg3lv", "target": "ABP NEWS"}, {"source": "@Mouj-h5o", "target": "ABP NEWS"}, {"source": "@mariadias1266", "target": "ABP NEWS"}, {"source": "@jayantabhaduri2296", "target": "ABP NEWS"}, {"source": "@jayantabhaduri2296", "target": "India Today"}, {"source": "@shaukatmomin9838", "target": "ABP NEWS"}, {"source": "@anantkanhake6308", "target": "ABP NEWS"}, {"source": "@satishvengatangu4332", "target": "ABP NEWS"}, {"source": "@chetan9654", "target": "ABP NEWS"}, {"source": "@Mna418", "target": "ABP NEWS"}, {"source": "@mohanp2535", "target": "ABP NEWS"}, {"source": "@TulunaduSafarnama", "target": "ABP NEWS"}, {"source": "@RajKumar-wq7xb", "target": "ABP NEWS"}, {"source": "@SaddamHusain-sk6my", "target": "ABP NEWS"}, {"source": "@lalitkumar9700", "target": "ABP NEWS"}, {"source": "@codnarcotiger4070", "target": "ABP NEWS"}, {"source": "@musicwala7172", "target": "ABP NEWS"}, {"source": "@agnelfurtado2831", "target": "ABP NEWS"}, {"source": "@ATULKUMAR-qk4do", "target": "ABP NEWS"}, {"source": "@jyotipanse8847", "target": "ABP NEWS"}, {"source": "@hamzafakhri6501", "target": "ABP NEWS"}, {"source": "@cwtsolutions", "target": "ABP NEWS"}, {"source": "@tahirahmad4857", "target": "ABP NEWS"}, {"source": "@tahirahmad4857", "target": "Aam Aadmi Party"}, {"source": "@\u0939\u093f\u0928\u094d\u0926\u0942\u092f\u0941\u0935\u093e\u0935\u093e\u0939\u093f\u0928\u0940-\u09258\u0935", "target": "ABP NEWS"}, {"source": "@VIJAY-cq4hz", "target": "ABP NEWS"}, {"source": "@\u0939\u093f\u0902\u0926\u0942\u0938\u0947\u0928\u093e-\u09182\u0917", "target": "ABP NEWS"}, {"source": "@surendersinghrawat682", "target": "ABP NEWS"}, {"source": "@indianmilitary4118", "target": "ABP NEWS"}, {"source": "@\u092c\u091c\u0930\u0902\u0917\u0926\u0932-\u09216\u0939", "target": "ABP NEWS"}, {"source": "@nayankarmakar2198", "target": "ABP NEWS"}, {"source": "@mcufanclub8027", "target": "ABP NEWS"}, {"source": "@mukeshkumargoel9206", "target": "ABP NEWS"}, {"source": "@SANJAYVN", "target": "ABP NEWS"}, {"source": "@histogram12345", "target": "Aam Aadmi Party"}, {"source": "@dks4695", "target": "Aam Aadmi Party"}, {"source": "@goemgoenkars2050", "target": "Aam Aadmi Party"}, {"source": "@prakashmakawal1998", "target": "Aam Aadmi Party"}, {"source": "@suyashkatare4237", "target": "Aam Aadmi Party"}, {"source": "@preetibaweja2338", "target": "Aam Aadmi Party"}, {"source": "@\u0939\u092e\u0928\u0939\u0940\u0902\u092d\u0942\u0932\u0947\u0902\u0917\u0947", "target": "Aam Aadmi Party"}, {"source": "@human6729", "target": "Aam Aadmi Party"}, {"source": "@HarshKumar-sh7ec", "target": "Aam Aadmi Party"}, {"source": "@suryan4206", "target": "Aam Aadmi Party"}, {"source": "@prave0101", "target": "Aam Aadmi Party"}, {"source": "@kashimsiddiqui8127", "target": "Aam Aadmi Party"}, {"source": "@vipulbhatnagar1756", "target": "Aam Aadmi Party"}, {"source": "@bharatbharat949", "target": "Aam Aadmi Party"}, {"source": "@kiranpaljaffri5904", "target": "Aam Aadmi Party"}, {"source": "@DeepakKumar-oh3bh", "target": "Aam Aadmi Party"}, {"source": "@dhan5102", "target": "MIRROR NOW"}, {"source": "@samkevin8469", "target": "MIRROR NOW"}, {"source": "@anandp1012", "target": "MIRROR NOW"}, {"source": "@dilipdixit6105", "target": "MIRROR NOW"}, {"source": "@thenationalist4772", "target": "MIRROR NOW"}, {"source": "@dilshad918", "target": "MIRROR NOW"}, {"source": "@007skumarajay", "target": "MIRROR NOW"}, {"source": "@rameshnayak700", "target": "MIRROR NOW"}, {"source": "@Jai.Hind-ME", "target": "MIRROR NOW"}, {"source": "@arumugammanivelramar6332", "target": "MIRROR NOW"}, {"source": "@jotendrakumar2852", "target": "MIRROR NOW"}, {"source": "@francescosivakumaran969", "target": "MIRROR NOW"}, {"source": "@maurilofernando8752", "target": "MIRROR NOW"}, {"source": "@rajeshsavji4663", "target": "MIRROR NOW"}, {"source": "@sahilbhavsar8194", "target": "NDTV"}, {"source": "@shyopatduddy7849", "target": "NDTV"}, {"source": "@dayanandcl347", "target": "NDTV"}, {"source": "@robbiethegreat8347", "target": "NDTV"}, {"source": "@lourdesmenezes1488", "target": "NDTV"}, {"source": "@richardfernandes9553", "target": "NDTV"}, {"source": "@snehaskitchen6642", "target": "NDTV"}, {"source": "@maduraipillai1917", "target": "India Today"}, {"source": "@ge4517", "target": "India Today"}, {"source": "@mukeshbalyan7600", "target": "India Today"}, {"source": "@artisharma359", "target": "India Today"}, {"source": "@rupeshreddy1713", "target": "India Today"}, {"source": "@saviofurtado6999", "target": "India Today"}, {"source": "@joaquimsilveira6439", "target": "India Today"}, {"source": "@identifiedchemistry2371", "target": "India Today"}, {"source": "@johncyr9124", "target": "India Today"}, {"source": "@antoniofernandes5404", "target": "India Today"}, {"source": "@udennyn", "target": "India Today"}, {"source": "@rajkapur7429", "target": "India Today"}, {"source": "@neerajyadav-bh4pr", "target": "India Today"}]};
+        
+        // Community colors (vibrant palette)
+        const communityColors = [
+            '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+            '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b',
+            '#27ae60', '#d35400', '#8e44ad', '#2c3e50', '#f1c40f'
+        ];
+        
+        // State
+        let colorMode = 'type'; // 'type' or 'community'
+        let showLabels = true;
+        let simulation = null;
+        let currentTransform = d3.zoomIdentity;
+        
+        // SVG setup
+        const svg = d3.select("#network");
+        const container = document.getElementById("viz-container");
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        svg.attr("viewBox", [0, 0, width, height]);
+        
+        // Create groups
+        const g = svg.append("g");
+        const linkGroup = g.append("g").attr("class", "links");
+        const nodeGroup = g.append("g").attr("class", "nodes");
+        const labelGroup = g.append("g").attr("class", "labels");
+        
+        // Zoom behavior with transform limits
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 10])
+            .on("zoom", (event) => {
+                currentTransform = event.transform;
+                g.attr("transform", event.transform);
+                
+                // Scale nodes inversely to zoom - THIS FIXES THE SIZE ISSUE!
+                const scale = 1 / event.transform.k;
+                nodeGroup.selectAll("circle")
+                    .attr("r", d => (3 + Math.sqrt(d.degree) * 1.5) * scale)
+                    .attr("stroke-width", 2 * scale);
+                
+                // Scale labels
+                labelGroup.selectAll("text")
+                    .attr("font-size", 11 * scale);
+            });
+        
+        svg.call(zoom);
+        
+        // Create force simulation
+        function createSimulation() {
+            simulation = d3.forceSimulation(networkData.nodes)
+                .force("link", d3.forceLink(networkData.edges)
+                    .id(d => d.id)
+                    .distance(50))
+                .force("charge", d3.forceManyBody()
+                    .strength(-200))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide()
+                    .radius(d => 5 + Math.sqrt(d.degree) * 2));
+            
+            simulation.on("tick", ticked);
+        }
+
+
+//Custom soft envelope force
+function forceEnvelope(strength = 0.02) {
+    return function(alpha) {
+        for (const d of networkData.nodes) {
+            if (d.x == null || d.y == null) continue;
+
+            const dx = d.x - envelope.cx;
+            const dy = d.y - envelope.cy;
+
+            const nx = dx / envelope.rx;
+            const ny = dy / envelope.ry;
+            const r2 = nx * nx + ny * ny;
+
+            if (r2 > 1) {
+                const excess = Math.sqrt(r2) - 1;
+                d.vx += -dx * excess * strength * alpha;
+                d.vy += -dy * excess * strength * alpha;
+            }
+        }
+    };
+}
+
+
+        
+        // Draw network
+        let link, node, label;
+        
+        function drawNetwork() {
+            // Clear existing
+            linkGroup.selectAll("*").remove();
+            nodeGroup.selectAll("*").remove();
+            labelGroup.selectAll("*").remove();
+            
+            // Filter data
+            const filteredNodes = networkData.nodes.filter(d => {
+                const typeMatch = (d.type === 'user' && document.getElementById('show-users').checked) ||
+                                (d.type === 'keyword' && document.getElementById('show-keywords').checked);
+                const degreeMatch = d.degree >= parseInt(document.getElementById('degree-slider').value);
+                return typeMatch && degreeMatch;
+            });
+            
+            const nodeIds = new Set(filteredNodes.map(d => d.id));
+            const filteredEdges = networkData.edges.filter(e => 
+                nodeIds.has(e.source.id || e.source) && nodeIds.has(e.target.id || e.target)
+            );
+            
+            // Update stats
+            document.getElementById('visible-nodes').textContent = filteredNodes.length;
+            document.getElementById('visible-edges').textContent = filteredEdges.length;
+            document.getElementById('total-nodes').textContent = networkData.nodes.length;
+            
+            // Create links
+            link = linkGroup.selectAll("path")
+                .data(filteredEdges)
+                .join("path")
+                .attr("class", "link");
+            
+            // Create nodes
+            node = nodeGroup.selectAll("circle")
+                .data(filteredNodes)
+                .join("circle")
+                .attr("class", d => `node ${d.type}`)
+                .attr("r", d => 3 + Math.sqrt(d.degree) * 1.5)
+                .style("fill", getNodeColor)
+                .call(drag(simulation));
+            
+            // Create labels
+            label = labelGroup.selectAll("text")
+                .data(filteredNodes)
+                .join("text")
+                .attr("class", "node-label")
+                .text(d => d.label)
+                .style("display", d => showLabels && d.degree > 3 ? "block" : "none");
+            
+            // Add interactions
+            addInteractions();
+            
+            // Update simulation
+            if (simulation) {
+                simulation.nodes(filteredNodes);
+                simulation.force("link").links(filteredEdges);
+                simulation.alpha(0.3).restart();
+            }
+            
+            // Hide loading
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        function ticked() {
+            link.attr("d", d => {
+                const sourceX = d.source.x || 0;
+                const sourceY = d.source.y || 0;
+                const targetX = d.target.x || 0;
+                const targetY = d.target.y || 0;
+                return `M${sourceX},${sourceY} L${targetX},${targetY}`;
+            });
+            
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+            
+            label
+                .attr("x", d => d.x)
+                .attr("y", d => d.y - 10);
+        }
+        
+        function getNodeColor(d) {
+            if (colorMode === 'community') {
+                return communityColors[d.community % communityColors.length];
+            }
+            return d.type === 'user' ? '#3498db' : '#e74c3c';
+        }
+        
+        // Drag behavior
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+        
+        // Interactions
+        const tooltip = d3.select("#tooltip");
+        
+        function addInteractions() {
+            node
+                .on("mouseover", function(event, d) {
+                    tooltip
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 15) + "px")
+                        .classed("visible", true)
+                        .html(`
+                            <div class="tooltip-title">${d.label}</div>
+                            <div class="tooltip-row">Type: ${d.type === 'user' ? 'User/Channel' : 'Keyword'}</div>
+                            <div class="tooltip-row">Connections: ${d.degree}</div>
+                            <div class="tooltip-row">Community: ${d.community + 1}</div>
+                        `);
+                    
+                    highlightConnections(d);
+                })
+                .on("mouseout", function() {
+                    tooltip.classed("visible", false);
+                    clearHighlight();
+                })
+                .on("mousemove", function(event) {
+                    tooltip
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 15) + "px");
+                })
+                .on("click", function(event, d) {
+                    searchNode(d.id);
+                });
+        }
+        
+        function highlightConnections(d) {
+            const connectedNodes = new Set();
+            connectedNodes.add(d.id);
+            
+            link.each(function(l) {
+                const sourceId = l.source.id || l.source;
+                const targetId = l.target.id || l.target;
+                
+                if (sourceId === d.id) {
+                    connectedNodes.add(targetId);
+                    d3.select(this).classed("highlighted", true);
+                } else if (targetId === d.id) {
+                    connectedNodes.add(sourceId);
+                    d3.select(this).classed("highlighted", true);
+                } else {
+                    d3.select(this).classed("dimmed", true);
+                }
+            });
+            
+            node.each(function(n) {
+                if (connectedNodes.has(n.id)) {
+                    d3.select(this).classed("highlighted", true);
+                } else {
+                    d3.select(this).classed("dimmed", true);
+                }
+            });
+        }
+        
+        function clearHighlight() {
+            link.classed("highlighted dimmed", false);
+            node.classed("highlighted dimmed", false);
+        }
+        
+        // Search functionality
+        const searchBox = document.getElementById('search-box');
+        const searchResults = document.getElementById('search-results');
+        
+        searchBox.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (query.length < 2) {
+                searchResults.innerHTML = '';
+                return;
+            }
+            
+            const matches = networkData.nodes
+                .filter(n => n.label.toLowerCase().includes(query))
+                .slice(0, 10);
+            
+            searchResults.innerHTML = matches.map(n => 
+                `<div class="search-result-item" onclick="searchNode('${n.id}')">
+                    ${n.label} <span style="color: #999;">(${n.type})</span>
+                </div>`
+            ).join('');
+        });
+        
+        function searchNode(nodeId) {
+            const nodeData = networkData.nodes.find(n => n.id === nodeId);
+            if (!nodeData) return;
+            
+            // Clear previous highlights
+            clearHighlight();
+            
+            // Highlight this node
+            node.each(function(d) {
+                if (d.id === nodeId) {
+                    d3.select(this).classed("highlighted", true);
+                    
+                    // Zoom to node
+                    const scale = 2;
+                    const x = -d.x * scale + width / 2;
+                    const y = -d.y * scale + height / 2;
+                    
+                    svg.transition()
+                        .duration(750)
+                        .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+                }
+            });
+            
+            highlightConnections(nodeData);
+        }
+        
+        // Filter controls
+        document.getElementById('show-users').addEventListener('change', drawNetwork);
+        document.getElementById('show-keywords').addEventListener('change', drawNetwork);
+        document.getElementById('degree-slider').addEventListener('input', function(e) {
+            document.getElementById('degree-value').textContent = e.target.value + '+';
+            drawNetwork();
+        });
+        
+        // Layout controls
+        document.getElementById('start-simulation').addEventListener('click', () => {
+            if (!simulation) createSimulation();
+            simulation.alpha(1).restart();
+        });
+        
+        document.getElementById('stop-simulation').addEventListener('click', () => {
+            if (simulation) simulation.stop();
+        });
+        
+        document.getElementById('reset-zoom').addEventListener('click', () => {
+            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+        });
+        
+        // Color mode controls
+        document.getElementById('color-by-type').addEventListener('click', () => {
+            colorMode = 'type';
+            node.style("fill", getNodeColor);
+            updateLegend();
+        });
+        
+        document.getElementById('color-by-community').addEventListener('click', () => {
+            colorMode = 'community';
+            node.style("fill", getNodeColor);
+            updateLegend();
+        });
+        
+        // Label toggle
+        document.getElementById('toggle-labels').addEventListener('click', () => {
+            showLabels = !showLabels;
+            label.style("display", d => showLabels && d.degree > 3 ? "block" : "none");
+        });
+        
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            svg.transition().duration(300).call(zoom.scaleBy, 1.3);
+        });
+        
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+        });
+        
+        // Export functions
+        document.getElementById('export-png').addEventListener('click', () => {
+            const svgElement = document.getElementById('network');
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.download = 'goa-network.png';
+                    a.href = url;
+                    a.click();
+                });
+            };
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        });
+        
+        document.getElementById('export-svg').addEventListener('click', () => {
+            const svgElement = document.getElementById('network');
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.download = 'goa-network.svg';
+            a.href = url;
+            a.click();
+        });
+        
+        // Update legend
+        function updateLegend() {
+            const legendContent = document.getElementById('legend-content');
+            
+            if (colorMode === 'type') {
+                legendContent.innerHTML = `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3498db;"></div>
+                        <span>Users/Channels</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e74c3c;"></div>
+                        <span>Keywords</span>
+                    </div>
+                `;
+            } else {
+                const numCommunities = Math.max(...networkData.nodes.map(n => n.community)) + 1;
+                legendContent.innerHTML = Array.from({length: Math.min(numCommunities, 8)}, (_, i) => `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${communityColors[i]};"></div>
+                        <span>Community ${i + 1}</span>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        // Initialize
+        createSimulation();
+        drawNetwork();
+        updateLegend();
+        
+        // Set max slider value based on data
+        const maxDegree = Math.max(...networkData.nodes.map(n => n.degree));
+        document.getElementById('degree-slider').max = maxDegree;
+    </script>
+</body>
+</html>
