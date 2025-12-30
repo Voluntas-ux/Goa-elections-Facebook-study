@@ -8,6 +8,8 @@ The primary data source is the **Youtube API**. The analysis constructs **keywor
 
 Important links:
 
-Keyword-User Network: 
-Reply-to Network:
-User-User Network: 
+Keyword-User Network: https://voluntas-ux.github.io/Goa-elections-networks-study/k2n
+
+Reply-to Network: https://voluntas-ux.github.io/Goa-elections-networks-study/reply-to
+
+User-User Network: https://voluntas-ux.github.io/Goa-elections-networks-study/User-User
