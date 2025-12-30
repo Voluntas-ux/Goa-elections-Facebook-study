@@ -8,6 +8,15 @@ The primary data source is the **Youtube API**. The analysis constructs **keywor
 
 Important links:
 
+
+ <a href="k2n.html" title="Keyword-user network">About Me</a>
+
+  <a href="reply-to.html" title="Reply-to network">About Me</a>
+
+   <a href="User-User.html" title="User-user network">About Me</a>
+
+If the above hyperlinks do not work please copy passte the following links to browser:
+
 Keyword-User Network: https://voluntas-ux.github.io/Goa-elections-networks-study/k2n
 
 Reply-to Network: https://voluntas-ux.github.io/Goa-elections-networks-study/reply-to
